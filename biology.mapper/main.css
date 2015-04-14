@@ -1,0 +1,18 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+
+}
+
+.canvas-container {
+    overflow: hidden;
+    flex-grow: 1;
+}
+
+.footage {
+    height: 20px;
+}
