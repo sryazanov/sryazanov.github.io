@@ -69,7 +69,7 @@ function Composition(domContainer) {
 
     window.addEventListener('resize', this.resize.bind(this));
     this._domContainer.addEventListener('drop', this._onDrop.bind(this));
-    this._domContainer.querySelector('#load-mash-button').addEventListener('click', this._onLoadMashButtonClick.bind(this));
+    this._domContainer.querySelector('#load-mesh-button').addEventListener('click', this._onLoadMashButtonClick.bind(this));
 
     var controller = new RotationController(this._domContainer.querySelector('.canvas-container'));
     controller.onrotate = this._onRotate.bind(this);
