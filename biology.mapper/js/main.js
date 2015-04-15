@@ -56,6 +56,13 @@ function Composition(domContainer) {
     this._renderer = new THREE.WebGLRenderer({canvas: this._domContainer.querySelector('canvas')});
     this._mesh = null;
 
+    var spotLight = new THREE.SpotLight(0xffffff);
+    spotLight.position.set(-40, 60, -10);
+    this._scene.add( spotLight );
+
+    this._material = new THREE.MeshLambertMaterial({color: 0xffff00});
+    this._material.emissive = new THREE.Color(0x0000ff);
+
     // Configure scene
     var axes = new THREE.AxisHelper(20);
     this._scene.add(axes);
@@ -84,14 +91,6 @@ Composition.prototype = {
         this._camera.aspect = width / height;
         this._camera.updateProjectionMatrix();
         this._renderer.setSize(width, height);
-
-        var spotLight = new THREE.SpotLight(0xffffff);
-        spotLight.position.set(-40, 60, -10);
-        this._scene.add( spotLight );
-
-        this._material = new THREE.MeshLambertMaterial({color: 0xffff00});
-        this._material.wireFrame = true;
-        this._material.emissive = new THREE.Color(0x0000ff);
 
         this.redraw();
     },
