@@ -1,18 +1,18 @@
 function mapBiologyData(geometry) {
-	var positions = geometry.getAttribute('position');
-	var count = positions.length / positions.itemSize;
+    var positions = geometry.getAttribute('position');
+    var count = positions.length / positions.itemSize;
 
-	if (!geometry.getAttribute('color')) {
-		geometry.addAttribute(new THREE.BufferAttribute(new Float32Array(count * 3), 3));
-	}
+    if (!geometry.getAttribute('color')) {
+        geometry.addAttribute(new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+    }
 
-	var colors = geometry.getAttribute('color');
-	for (var i = 0; i < count; i++) {
-		colors.array[i * 3 + 0] = Math.random();
-		colors.array[i * 3 + 1] = Math.random();
-		colors.array[i * 3 + 2] = Math.random();
-	}
-	colors.needsUpdate = true;
+    var colors = geometry.getAttribute('color');
+    for (var i = 0; i < count; i++) {
+        colors.array[i * 3 + 0] = Math.random();
+        colors.array[i * 3 + 1] = Math.random();
+        colors.array[i * 3 + 2] = Math.random();
+    }
+    colors.needsUpdate = true;
 }
 
 function Composition(domContainer) {
@@ -43,6 +43,9 @@ function Composition(domContainer) {
     this._camera.lookAt(this._scene.position);
 
     window.addEventListener('resize', this.resize.bind(this));
+    this._domContainer.addEventListener('dragenter', this._onDragEnter.bind(this));
+    this._domContainer.addEventListener('dragleave', this._onDragLeave.bind(this));
+    this._domContainer.addEventListener('dragover', this._onDragOver.bind(this));
     this._domContainer.addEventListener('drop', this._onDrop.bind(this));
     this._domContainer.querySelector('#load-mesh-button').addEventListener('click', this._onLoadMashButtonClick.bind(this));
 
@@ -50,6 +53,8 @@ function Composition(domContainer) {
     controls.target = this._scene.position;
     controls.update();
     controls.addEventListener('change', this.redraw.bind(this));
+
+    this.fileLoader_ = null;
 }
 
 Composition.prototype = {
@@ -70,25 +75,23 @@ Composition.prototype = {
     },
 
     loadFile: function(file) {
-        var reader = new FileReader();
-        reader.addEventListener('load', function(event) {
-            this.readSTL(event.target.result, file.name);
+        if (this.fileLoader_) {
+            this.fileLoader_.terminate();
+        }
+        this.fileLoader_ = new Worker('js/workers/MeshLoader.js');
+        this.fileLoader_.postMessage(file);
+        this.fileLoader_.addEventListener('message', function(event) {
+            if (event.data.status == 'success') {
+                var geometry = new THREE.BufferGeometry();
+                for (var name in event.data.attributes) {
+                    var attribute = event.data.attributes[name];
+                    geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
+                }
+                this.setGeometry(geometry);
+                this.redraw();
+            }
         }.bind(this));
-        reader.readAsBinaryString(file);
     },
-
-    readSTL: function(contents, fileName) {
-    	var contents = event.target.result;
-		var geometry = new THREE.STLLoader().parse(contents);
-		geometry.sourceType = "stl";
-		geometry.sourceFile = fileName;
-
-		var center = geometry.center();
-		mapBiologyData(geometry);
-
-		this.setGeometry(geometry);
-		this.redraw();
-	},
 
     setGeometry: function(geometry) {
         if (this._mesh) {
@@ -98,43 +101,38 @@ Composition.prototype = {
         this._scene.add(this._mesh);
     },
 
+    _onDragEnter: function(event) {
+        // TODO: Show drag visual effect.
+    },
+
+    _onDragLeave: function(event) {
+        // TODO: Remove drag visual effect.
+    },
+
+    _onDragOver: function(event) {
+        // TODO: Add filtering by file type.
+        event.preventDefault();
+    },
+
     _onDrop: function(event) {
         event.preventDefault();
-		event.stopPropagation();
-		this.loadFile(event.dataTransfer.files[0]);
+        event.stopPropagation();
+        this.loadFile(event.dataTransfer.files[0]);
     },
 
     _onLoadMashButtonClick: function() {
-        var fileInput = document.createElement( 'input' );
-	   fileInput.type = 'file';
-	   fileInput.addEventListener('change', function(event) {
-	       this.loadFile(fileInput.files[0]);
-	   }.bind(this));
-	   fileInput.click();
-    },
-
-    _onRotate: function(rotation) {
-    	if (!this._mesh) return;
-
-    	this._mesh.rotation.x += rotation.x;
-    	this._mesh.rotation.y += rotation.y;
-
-    	if (rotation.distance) {
-    		var distance = this._camera.position.length() + rotation.distance;
-    		if (distance < 1)
-    			distance = 1;
-    		this._camera.position.setLength(distance);
-    		this._camera.updateProjectionMatrix();
-    	}
-
-    	this.redraw();
+        var fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.addEventListener('change', function(event) {
+            this.loadFile(fileInput.files[0]);
+        }.bind(this));
+        fileInput.click();
     },
 };
 
 var g_composition;
 
 $(function() {
-    console.log("Loaded");
     g_composition = new Composition(document.body);
     g_composition.resize();
 });

@@ -1,0 +1,31 @@
+importScripts('../lib/three.min.js', '../lib/STLLoader.js');
+
+onmessage = function(e) {
+    var file = e.data;
+    reader.addEventListener('load', function(event) {
+        // TODO: handle errors.
+        readContents(event.target.result);
+    });
+    reader.readAsArrayBuffer(e.data);
+}
+
+var reader = new FileReader();
+
+function readContents(contents, fileName) {
+    var geometry = new THREE.STLLoader().parse(contents);
+    geometry.center();
+
+    // TODO: This only works with binary file format. Handle text format.
+    var attributes = {};
+    for (var name in geometry.attributes) {
+        attributes[name] = {
+            array: geometry.attributes[name].array,
+            itemSize: geometry.attributes[name].itemSize
+        };
+    }
+
+    postMessage({
+            status: 'success',
+            attributes: attributes,
+        });
+}
