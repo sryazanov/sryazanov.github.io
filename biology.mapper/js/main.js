@@ -47,7 +47,8 @@ function Composition(domContainer) {
     this._domContainer.addEventListener('dragleave', this._onDragLeave.bind(this));
     this._domContainer.addEventListener('dragover', this._onDragOver.bind(this));
     this._domContainer.addEventListener('drop', this._onDrop.bind(this));
-    this._domContainer.querySelector('#load-mesh-button').addEventListener('click', this._onLoadMashButtonClick.bind(this));
+    $('#load-mesh-button').click(this._onLoadMeshButtonClick.bind(this));
+    $('#load-spots-button').click(this._onLoadSpotsButtonClick.bind(this));
 
     var controls = new THREE.OrbitControls(this._camera, this._domContainer.querySelector('.canvas-container'));
     controls.target = this._scene.position;
@@ -74,22 +75,20 @@ Composition.prototype = {
         this._renderer.render(this._scene, this._camera);
     },
 
-    loadFile: function(file) {
-        if (this.fileLoader_) {
-            this.fileLoader_.terminate();
-        }
-        this.fileLoader_ = new Worker('js/workers/MeshLoader.js');
-        this.fileLoader_.postMessage(file);
-        this.fileLoader_.addEventListener('message', function(event) {
-            if (event.data.status == 'success') {
-                var geometry = new THREE.BufferGeometry();
-                for (var name in event.data.attributes) {
-                    var attribute = event.data.attributes[name];
-                    geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
-                }
-                this.setGeometry(geometry);
-                this.redraw();
+    loadMesh: function(file) {
+        this._loadFile(file, 'MeshLoader.js').then(function(result) {
+            var geometry = new THREE.BufferGeometry();
+            for (var name in event.data.attributes) {
+                var attribute = event.data.attributes[name];
+                geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
             }
+            this.setGeometry(geometry);
+            this.redraw();
+        }.bind(this));
+    },
+
+    loadSpots: function(file) {
+        this._loadFile(file, 'SpotsLoader.js').then(function(result) {
         }.bind(this));
     },
 
@@ -120,13 +119,43 @@ Composition.prototype = {
         this.loadFile(event.dataTransfer.files[0]);
     },
 
-    _onLoadMashButtonClick: function() {
-        var fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.addEventListener('change', function(event) {
-            this.loadFile(fileInput.files[0]);
-        }.bind(this));
-        fileInput.click();
+    _loadFile: function(file, worker) {
+        if (this.fileLoader_) {
+            this.fileLoader_.terminate();
+        }
+        var worker = new Worker('js/workers/' + worker);
+        this.fileLoader_ = worker;
+        return new Promise(function(resolve, reject) {
+            worker.addEventListener('message', function(event) {
+                if (this.fileLoader_) {
+                    this.fileLoader_.terminate();
+                    this.fileLoader_ = null;
+                }
+                if (event.data.status == 'success') {
+                    resolve(event.data);
+                }
+            });
+            worker.postMessage(file);
+        });
+    },
+
+    _openFile: function() {
+        return new Promise(function(resolve) {
+            var fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.addEventListener('change', function() {
+                resolve(fileInput.files[0]);
+            });
+            fileInput.click();
+        });
+    },
+
+    _onLoadMeshButtonClick: function() {
+        this._openFile().then(this.loadMesh.bind(this));
+    },
+
+    _onLoadSpotsButtonClick: function() {
+        this._openFile().then(this.loadSpots.bind(this));
     },
 };
 
