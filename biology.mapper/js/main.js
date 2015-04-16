@@ -1,53 +1,19 @@
-function RotationController(element, initialRotation) {
-	element.addEventListener('mousedown', this._onMouseDown.bind(this), false);
-	element.addEventListener('mousewheel', this._onMouseWheel.bind(this), false);
-	this._state = null;
+function mapBiologyData(geometry) {
+	var positions = geometry.getAttribute('position');
+	var count = positions.length / positions.itemSize;
+
+	if (!geometry.getAttribute('color')) {
+		geometry.addAttribute(new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+	}
+
+	var colors = geometry.getAttribute('color');
+	for (var i = 0; i < count; i++) {
+		colors.array[i * 3 + 0] = Math.random();
+		colors.array[i * 3 + 1] = Math.random();
+		colors.array[i * 3 + 2] = Math.random();
+	}
+	colors.needsUpdate = true;
 }
-
-RotationController.prototype = {
-	_onMouseDown: function(event) {
-		this._state = {
-			handlers: {
-				'mousemove': this._onMouseMove.bind(this),
-				'mouseup': this._onMouseUp.bind(this),
-			},
-			initialX: event.x,
-			initialY: event.y,
-			currentX: event.x,
-			currentY: event.y,
-		};
-		for (var e in this._state.handlers) {
-			document.addEventListener(e, this._state.handlers[e]);
-		}
-	},
-
-	_onMouseMove: function(event) {
-		this.onrotate({
-			x: (event.x - this._state.currentX) / 100,
-			y: (event.y - this._state.currentY) / 100,
-			distance: 0
-		});
-		this._state.currentX = event.x;
-		this._state.currentY = event.y;
-	},
-
-	_onMouseUp: function(event) {
-		for (var e in this._state.handlers) {
-			document.removeEventListener(e, this._state.handlers[e]);
-		}
-		this._handlers = null;
-	},
-
-	_onMouseWheel: function(event) {
-		this.onrotate({
-			x: 0,
-			y: 0,
-			distance: -event.wheelDelta / 10
-		});
-	},
-
-	onrotate: function(rotation) {}
-};
 
 function Composition(domContainer) {
     this._domContainer = domContainer;
@@ -60,8 +26,10 @@ function Composition(domContainer) {
     spotLight.position.set(-40, 60, -10);
     this._scene.add( spotLight );
 
-    this._material = new THREE.MeshLambertMaterial({color: 0xffff00});
-    this._material.emissive = new THREE.Color(0x0000ff);
+    this._material = new THREE.MeshLambertMaterial({
+        color: 0xffff00,
+        emissive: 0x0000ff,
+        vertexColors: THREE.VertexColors});
 
     // Configure scene
     var axes = new THREE.AxisHelper(20);
@@ -78,8 +46,10 @@ function Composition(domContainer) {
     this._domContainer.addEventListener('drop', this._onDrop.bind(this));
     this._domContainer.querySelector('#load-mesh-button').addEventListener('click', this._onLoadMashButtonClick.bind(this));
 
-    var controller = new RotationController(this._domContainer.querySelector('.canvas-container'));
-    controller.onrotate = this._onRotate.bind(this);
+    var controls = new THREE.OrbitControls(this._camera, this._domContainer.querySelector('.canvas-container'));
+    controls.target = this._scene.position;
+    controls.update();
+    controls.addEventListener('change', this.redraw.bind(this));
 }
 
 Composition.prototype = {
@@ -114,6 +84,7 @@ Composition.prototype = {
 		geometry.sourceFile = fileName;
 
 		var center = geometry.center();
+		mapBiologyData(geometry);
 
 		this.setGeometry(geometry);
 		this.redraw();
