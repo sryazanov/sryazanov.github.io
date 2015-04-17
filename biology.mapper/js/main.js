@@ -1,20 +1,3 @@
-function mapBiologyData(geometry) {
-    var positions = geometry.getAttribute('position');
-    var count = positions.length / positions.itemSize;
-
-    if (!geometry.getAttribute('color')) {
-        geometry.addAttribute(new THREE.BufferAttribute(new Float32Array(count * 3), 3));
-    }
-
-    var colors = geometry.getAttribute('color');
-    for (var i = 0; i < count; i++) {
-        colors.array[i * 3 + 0] = Math.random();
-        colors.array[i * 3 + 1] = Math.random();
-        colors.array[i * 3 + 2] = Math.random();
-    }
-    colors.needsUpdate = true;
-}
-
 function Composition(domContainer) {
     this._domContainer = domContainer;
     this._scene = new THREE.Scene();
@@ -22,9 +5,15 @@ function Composition(domContainer) {
     this._renderer = new THREE.WebGLRenderer({canvas: this._domContainer.querySelector('canvas')});
     this._mesh = null;
 
+    this._model = new Model();
+    this._model.addEventListener('geometry-change', this._onModelGeometryChange.bind(this));
+    this._model.addEventListener('status-change', this._onModelStatusChange.bind(this));
+
+    // Light
     var spotLight = new THREE.SpotLight(0xffffff);
     spotLight.position.set(-40, 60, -10);
-    this._scene.add( spotLight );
+    this._scene.add(spotLight);
+    this._scene.add(new THREE.AmbientLight('#0c0c0c'));
 
     this._material = new THREE.MeshLambertMaterial({
         color: 0xffff00,
@@ -34,7 +23,6 @@ function Composition(domContainer) {
     // Configure scene
     var axes = new THREE.AxisHelper(20);
     this._scene.add(axes);
-    this.setGeometry(new THREE.SphereGeometry(4, 20, 20));
 
     // Configure camera
     this._camera.position.x = -30;
@@ -56,6 +44,8 @@ function Composition(domContainer) {
     controls.update();
     controls.addEventListener('change', this.redraw.bind(this));
 
+    this._model.setGeometry(new THREE.SphereGeometry(4, 20, 20));
+
     this.fileLoader_ = null;
 }
 
@@ -76,36 +66,20 @@ Composition.prototype = {
         this._renderer.render(this._scene, this._camera);
     },
 
-    loadMesh: function(file) {
-        this._loadFile(file, 'MeshLoader.js').then(function(result) {
-            var geometry = new THREE.BufferGeometry();
-            for (var name in event.data.attributes) {
-                var attribute = event.data.attributes[name];
-                geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
-            }
-            this.setGeometry(geometry);
-            this.redraw();
-        }.bind(this));
-    },
-
-    loadSpots: function(file) {
-        this._loadFile(file, 'SpotsLoader.js').then(function(result) {
-            if (result.data) {
-                this._spots = result.data;
-            }
-        }.bind(this));
-    },
-
-    setGeometry: function(geometry) {
+    _onModelGeometryChange: function() {
         if (this._mesh) {
             this._scene.remove(this._mesh);
         }
-        this._mesh = new THREE.Mesh(geometry, this._material);
-        this._scene.add(this._mesh);
+        var geometry = this._model.getGeometry();
+        if (geometry) {
+            this._mesh = new THREE.Mesh(this._model.getGeometry(), this._material);
+            this._scene.add(this._mesh);
+        }
+        this.redraw();
     },
 
-    getGeometry: function() {
-        return this._mesh ? this._mesh.geometry : null;
+    _onModelStatusChange: function() {
+        
     },
 
     _onDragEnter: function(event) {
@@ -127,26 +101,6 @@ Composition.prototype = {
         this.loadFile(event.dataTransfer.files[0]);
     },
 
-    _loadFile: function(file, worker) {
-        if (this.fileLoader_) {
-            this.fileLoader_.terminate();
-        }
-        var worker = new Worker('js/workers/' + worker);
-        this.fileLoader_ = worker;
-        return new Promise(function(resolve, reject) {
-            worker.addEventListener('message', function(event) {
-                if (this.fileLoader_) {
-                    this.fileLoader_.terminate();
-                    this.fileLoader_ = null;
-                }
-                if (event.data.status == 'success') {
-                    resolve(event.data);
-                }
-            });
-            worker.postMessage(file);
-        });
-    },
-
     _openFile: function() {
         return new Promise(function(resolve) {
             var fileInput = document.createElement('input');
@@ -159,33 +113,15 @@ Composition.prototype = {
     },
 
     _onLoadMeshButtonClick: function() {
-        this._openFile().then(this.loadMesh.bind(this));
+        this._openFile().then(this._model.loadGeometry.bind(this._model));
     },
 
     _onLoadSpotsButtonClick: function() {
-        this._openFile().then(this.loadSpots.bind(this));
+        this._openFile().then(this._model.loadSpots.bind(this._model));
     },
 
     _onMapButtonClick: function() {
-        var geometry = this.getGeometry();
-        var worker = new Worker('js/workers/Mapper.js');
-        worker.postMessage({
-            verteces: geometry.getAttribute('original-position').array,
-            spots: this._spots
-        });
-        worker.addEventListener('message', function(event) {
-            var geometry = this.getGeometry();
-            if (event.data.status = 'success') {
-                if (geometry.getAttribute('color')) {
-                    var colors = geometry.getAttribute('color');
-                    colors.array.set(event.data.colors);
-                    colors.needsUpdate = true;
-                } else {
-                    geometry.addAttrinute('color', new THREE.BufferAttribute(event.data.colors, 3));
-                }
-                this.redraw();
-            }
-        }.bind(this));
+        this._model.map();
     },
 };
 
