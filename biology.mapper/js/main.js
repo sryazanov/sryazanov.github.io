@@ -2,23 +2,25 @@ function Composition(domContainer) {
     this._domContainer = domContainer;
     this._scene = new THREE.Scene();
     this._camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-    this._renderer = new THREE.WebGLRenderer({canvas: this._domContainer.querySelector('canvas')});
+    this._renderer = new THREE.WebGLRenderer({antialias: true, canvas: this._domContainer.querySelector('canvas')});
     this._mesh = null;
 
     this._model = new Model();
     this._model.addEventListener('geometry-change', this._onModelGeometryChange.bind(this));
     this._model.addEventListener('status-change', this._onModelStatusChange.bind(this));
+    this._model.addEventListener('uv-mapping-change', this.redraw.bind(this));
 
     // Light
-    var spotLight = new THREE.SpotLight(0xffffff);
+    var spotLight = new THREE.PointLight( 0xffffff, 1, 100 );
     spotLight.position.set(-40, 60, -10);
     this._scene.add(spotLight);
-    this._scene.add(new THREE.AmbientLight('#0c0c0c'));
+    this._scene.add(new THREE.AmbientLight('#404040'));
 
+    var texture = THREE.ImageUtils.loadTexture('img/texture.png', {}, this.redraw.bind(this));
     this._material = new THREE.MeshLambertMaterial({
         color: 0xffff00,
-        emissive: 0x0000ff,
-        vertexColors: THREE.VertexColors});
+        map: texture
+    });
 
     // Configure scene
     var axes = new THREE.AxisHelper(20);
@@ -79,7 +81,7 @@ Composition.prototype = {
     },
 
     _onModelStatusChange: function() {
-        
+        $('#status').text(this._model.getStatus());
     },
 
     _onDragEnter: function(event) {

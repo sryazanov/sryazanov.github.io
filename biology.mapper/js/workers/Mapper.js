@@ -17,7 +17,7 @@ onmessage = function(e) {
             progress++;
             nextChunk = Math.ceil((progress + 1) * pointCount / 100);
             postMessage({
-                status: 'progress',
+                status: 'calculating',
                 progress: progress
             })
         }
@@ -31,15 +31,17 @@ onmessage = function(e) {
 
         for (var j = 0; j < spots.length; j++) {
             var spot = spots[j];
+            var r = spot.Radii;
+            if (isNaN(r)) continue;
+
             var dx = spot.X - x;
             var dy = spot.Y - y;
             var dz = spot.Z - z;
-            var r = spot.Radii;
             var rsq = dx * dx + dy * dy + dz * dz;
 
             if (rsq > r * r) continue;
 
-            if (closestSpotIndex > 0 || rsq < closesSpotSquareDistance) {
+            if (closestSpotIndex < 0 || rsq < closesSpotSquareDistance) {
                 closesSpotSquareDistance = rsq;
                 closestSpotIndex = j;
             }
@@ -48,6 +50,7 @@ onmessage = function(e) {
         closestSpotIndeces[i] = closestSpotIndex;
         if (closestSpotIndex >= 0) {
             closestSpotDistances[i] = Math.sqrt(closesSpotSquareDistance) / spots[closestSpotIndex].Radii;
+            highlightedVerteces++;
         } else {
             closestSpotDistances[i] = 1.0;
         }
