@@ -12,8 +12,18 @@ var reader = new FileReader();
 
 function sendContents(results) {
     console.log(results);
+
+    var spots = results.data;
+    for (var i = 0; i < spots.length; i++) {
+        var spot = spots[i];
+        spot.X = Number(spot.X);
+        spot.Y = Number(spot.Y);
+        spot.Z = Number(spot.Z);
+        spot.Radii = Number(spot.Radii);
+    }
+
     postMessage({
         status: 'success',
-        data: results.data,
+        data: spots,
     });
 }

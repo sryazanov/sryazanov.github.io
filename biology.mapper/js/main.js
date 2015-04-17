@@ -49,6 +49,7 @@ function Composition(domContainer) {
     this._domContainer.addEventListener('drop', this._onDrop.bind(this));
     $('#load-mesh-button').click(this._onLoadMeshButtonClick.bind(this));
     $('#load-spots-button').click(this._onLoadSpotsButtonClick.bind(this));
+    $('#map-button').click(this._onMapButtonClick.bind(this));
 
     var controls = new THREE.OrbitControls(this._camera, this._domContainer.querySelector('.canvas-container'));
     controls.target = this._scene.position;
@@ -89,6 +90,9 @@ Composition.prototype = {
 
     loadSpots: function(file) {
         this._loadFile(file, 'SpotsLoader.js').then(function(result) {
+            if (result.data) {
+                this._spots = result.data;
+            }
         }.bind(this));
     },
 
@@ -98,6 +102,10 @@ Composition.prototype = {
         }
         this._mesh = new THREE.Mesh(geometry, this._material);
         this._scene.add(this._mesh);
+    },
+
+    getGeometry: function() {
+        return this._mesh ? this._mesh.geometry : null;
     },
 
     _onDragEnter: function(event) {
@@ -156,6 +164,28 @@ Composition.prototype = {
 
     _onLoadSpotsButtonClick: function() {
         this._openFile().then(this.loadSpots.bind(this));
+    },
+
+    _onMapButtonClick: function() {
+        var geometry = this.getGeometry();
+        var worker = new Worker('js/workers/Mapper.js');
+        worker.postMessage({
+            verteces: geometry.getAttribute('original-position').array,
+            spots: this._spots
+        });
+        worker.addEventListener('message', function(event) {
+            var geometry = this.getGeometry();
+            if (event.data.status = 'success') {
+                if (geometry.getAttribute('color')) {
+                    var colors = geometry.getAttribute('color');
+                    colors.array.set(event.data.colors);
+                    colors.needsUpdate = true;
+                } else {
+                    geometry.addAttrinute('color', new THREE.BufferAttribute(event.data.colors, 3));
+                }
+                this.redraw();
+            }
+        }.bind(this));
     },
 };
 

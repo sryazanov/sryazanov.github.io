@@ -7,12 +7,13 @@ onmessage = function(e) {
         readContents(event.target.result);
     });
     reader.readAsArrayBuffer(e.data);
-}
+};
 
 var reader = new FileReader();
 
 function readContents(contents, fileName) {
     var geometry = new THREE.STLLoader().parse(contents);
+    geometry.addAttribute('original-position', cloneBufferAttribute(geometry.getAttribute('position')));
     geometry.center();
 
     // TODO: This only works with binary file format. Handle text format.
@@ -28,4 +29,10 @@ function readContents(contents, fileName) {
             status: 'success',
             attributes: attributes,
         });
+}
+
+function cloneBufferAttribute(origin) {
+    var array = new Float32Array(origin.array.length);
+    array.set(origin.array);
+    return new THREE.BufferAttribute(array, origin.itemSize);
 }
