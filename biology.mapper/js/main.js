@@ -8,7 +8,7 @@ function Composition(domContainer) {
     this._model = new Model();
     this._model.addEventListener('geometry-change', this._onModelGeometryChange.bind(this));
     this._model.addEventListener('status-change', this._onModelStatusChange.bind(this));
-    this._model.addEventListener('uv-mapping-change', this.redraw.bind(this));
+    this._model.addEventListener('color-change', this.redraw.bind(this));
 
     // Light
     var spotLight = new THREE.PointLight( 0xffffff, 1, 100 );
@@ -16,10 +16,8 @@ function Composition(domContainer) {
     this._scene.add(spotLight);
     this._scene.add(new THREE.AmbientLight('#404040'));
 
-    var texture = THREE.ImageUtils.loadTexture('img/texture.png', {}, this.redraw.bind(this));
     this._material = new THREE.MeshLambertMaterial({
-        color: 0xffff00,
-        map: texture
+        vertexColors: THREE.VertexColors
     });
 
     // Configure scene
