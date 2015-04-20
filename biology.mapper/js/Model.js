@@ -137,6 +137,7 @@ Model.prototype = {
                 this._setStatus('Mapping completed.');
                 this._recolor();
                 this._mapper = null;
+                worker.terminate();
             }
         }.bind(this));
     },
@@ -147,6 +148,7 @@ Model.prototype = {
             worker.addEventListener('message', function(event) {
                 if (event.data.status == 'success') {
                     resolve(event.data);
+                    worker.terminate();
                 }
             });
             worker.postMessage(file);

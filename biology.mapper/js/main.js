@@ -121,7 +121,7 @@ Composition.prototype = {
     _onDrop: function(event) {
         event.preventDefault();
         event.stopPropagation();
-        this.loadFile(event.dataTransfer.files[0]);
+        this._model.loadGeometry(event.dataTransfer.files[0]);
     },
 
     _openFile: function() {
