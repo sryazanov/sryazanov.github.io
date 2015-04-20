@@ -5,9 +5,7 @@ onmessage = function(e) {
     Papa.parse(file, {
         complete: sendContents
     })
-}
-
-var reader = new FileReader();
+};
 
 function sendContents(results) {
     console.log(results);
@@ -18,11 +16,13 @@ function sendContents(results) {
         var name = row[0];
         if (name && row.length >= 5) {
             spots.push({
+                name: name,
                 x: Number(row[1]),
                 y: Number(row[2]),
                 z: Number(row[3]),
                 r: Number(row[4]),
-                index: spots.lenght
+                index: spots.lenght,
+                intensity: 0.0,
             });
         }
     }

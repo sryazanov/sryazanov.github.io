@@ -2,13 +2,16 @@ function Model() {
     this._listeners = {
         'status-change': [],
         'geometry-change': [],
-        'color-change': []
+        'color-change': [],
+        'intensities-change': [],
     };
     this._geometry = null;
     this._spots = null;
     this._mapping = null;
     this._color = new THREE.Color('#001eb2');
     this._colorMap = new Model.JetColorMap();
+    this._scaleFunction = Math.log;
+    this._hotspotQuantile = 0.995;
 
     this._status = '';
 }
@@ -31,8 +34,16 @@ Model.prototype = {
         this._notifyChange('geometry-change');
     },
 
+    getMeasureNames: function() {
+        return this._intensities ? this._intensities.measureNames : [];
+    },
+
     loadGeometry: function(file) {
-        this._loadFile(file, 'MeshLoader.js').then(function(result) {
+        if (this._geometryLoader) {
+            this._geometryLoader.cancel();
+        }
+        this._geometryLoader = this._loadFile(file, 'MeshLoader.js').then(function(result) {
+            this._geometryLoader = null;
             var geometry = new THREE.BufferGeometry();
             for (var name in event.data.attributes) {
                 var attribute = event.data.attributes[name];
@@ -45,25 +56,72 @@ Model.prototype = {
     },
 
     loadSpots: function(file) {
-        this._loadFile(file, 'SpotsLoader.js').then(function(result) {
+        if (this._spotsLoader) {
+            this._spotsLoader.cancel();
+        }
+        this._spotsLoader = this._loadFile(file, 'SpotsLoader.js').then(function(result) {
+            this._spotsLoader = null;
             if (result.data) {
                 this._spots = result.data;
-
-                this._intencity = new Array(this._spots.length);
-                for (var i = 0; i < this._intencity.length; i++)
-                    this._intencity[i] = Math.random();
-
                 this.map();
             }
         }.bind(this));
     },
 
+    loadIntensities: function(file) {
+        if (this._intensitiesLoader) {
+            this._intensitiesLoader.terminate();
+        }
+        this._intensitiesLoader = this._loadFile(file, 'IntensitiesLoader.js').then(function(result) {
+            this._intensitiesLoader = null;
+            if (result.status == 'success') {
+                this._intensities = {
+                    measureNames: result.measureNames,
+                    measures: result.measures,
+                    spots: result.spots,
+                };
+                this._notifyChange('intensities-change');
+            }
+        }.bind(this));
+    },
+
+    selectMeasure: function(name) {
+        if (!this._intensities) return;
+
+        var measure = this._intensities.measures[name];
+        if (!measure) return;
+
+        // Apply the scale function.
+        measure = Array.prototype.map.call(measure, this._scaleFunction);
+
+        // Create map from spot name to spot.
+        var spotsMap = this._spots.reduce(function(h, e) { h[e.name] = e; return h; }, {});
+
+        // Array of references to stops.
+        var spots = this._intensities.spots.map(function(x) {return spotsMap[x];});
+
+        var max = measure.slice().sort()[Math.ceil((measure.length - 1) * this._hotspotQuantile )];
+
+        for (var i = 0; i < measure.length; i++) {
+            spots[i].intensity = Math.min(1.0, measure[i] / max);
+        }
+        this._recolor();
+    },
+
     map: function() {
         if (!this._geometry || !this._spots) return;
+        if (this._mapper) {
+            this._mapper.cancel();
+        }
 
         this._setStatus('Mapping...');
         var geometry = this.getGeometry();
         var worker = new Worker('js/workers/Mapper.js');
+        this._mapper = {
+            cancel: function() {
+                worker.terminate();
+            }
+        };
         worker.postMessage({
             verteces: geometry.getAttribute('original-position').array,
             spots: this._spots
@@ -78,42 +136,39 @@ Model.prototype = {
                 };
                 this._setStatus('Mapping completed.');
                 this._recolor();
+                this._mapper = null;
             }
         }.bind(this));
     },
 
     _loadFile: function(file, worker) {
-        if (this.fileLoader_) {
-            this.fileLoader_.terminate();
-        }
         var worker = new Worker('js/workers/' + worker);
-        this.fileLoader_ = worker;
-        return new Promise(function(resolve, reject) {
+        var promise = new Promise(function(resolve, reject) {
             worker.addEventListener('message', function(event) {
-                if (this.fileLoader_) {
-                    this.fileLoader_.terminate();
-                    this.fileLoader_ = null;
-                }
                 if (event.data.status == 'success') {
                     resolve(event.data);
                 }
             });
             worker.postMessage(file);
         });
+        promise.cancel = function() {
+            worker.terminate();
+        };
+        return promise;
     },
 
     _recolor: function() {
-        this._recolorGeometry(this._geometry, this._mapping, this._intencity);
+        this._recolorGeometry(this._geometry, this._mapping, this._spots);
         this._notifyChange('color-change');
     },
 
-    _recolorGeometry: function(geometry, mapping, intencity) {
+    _recolorGeometry: function(geometry, mapping, spots) {
         var startTime = new Date();
 
         var position = geometry.getAttribute('position');
         var positionCount = position.array.length / position.itemSize;
 
-        var intencityColor = new THREE.Color('#ff0000');
+        var intensityColor = new THREE.Color();
         var currentColor = new THREE.Color();
 
         if (!geometry.getAttribute('color')) {
@@ -125,10 +180,10 @@ Model.prototype = {
             var index = mapping ? mapping.closestSpotIndeces[i] : -1;
             currentColor.set(this._color);
             if (index >= 0) {
-                this._colorMap.map(intencityColor, intencity[index]);
+                this._colorMap.map(intensityColor, spots[index].intensity);
                 var alpha = 1.0 - mapping.closestSpotDistances[i];
                 alpha = alpha;
-                currentColor.lerp(intencityColor, alpha);
+                currentColor.lerp(intensityColor, alpha);
             }
 
             color[i * 3] = currentColor.r;
@@ -163,17 +218,17 @@ Model.ColorMap = function(colorValues) {
 };
 
 Model.ColorMap.prototype = {
-    map: function(color, intencity) {
-        if (intencity <= 0.0) {
+    map: function(color, intensity) {
+        if (intensity <= 0.0) {
             color.set(this._colors[0]);
             return;
         }
-        if (intencity >= 1.0) {
+        if (intensity >= 1.0) {
             color.set(this._colors[this._colors.length - 1]);
             return;
         }
 
-        var position = intencity * (this._colors.length - 1);
+        var position = intensity * (this._colors.length - 1);
         var index = Math.floor(position);
         var alpha = position - index;
 

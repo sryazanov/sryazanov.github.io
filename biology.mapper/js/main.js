@@ -1,14 +1,15 @@
-function Composition(domContainer) {
+function Composition(domContainer, model) {
     this._domContainer = domContainer;
     this._scene = new THREE.Scene();
     this._camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
     this._renderer = new THREE.WebGLRenderer({antialias: true, canvas: this._domContainer.querySelector('canvas')});
     this._mesh = null;
 
-    this._model = new Model();
+    this._model = model;
     this._model.addEventListener('geometry-change', this._onModelGeometryChange.bind(this));
     this._model.addEventListener('status-change', this._onModelStatusChange.bind(this));
     this._model.addEventListener('color-change', this.redraw.bind(this));
+    this._model.addEventListener('intensities-change', this._onModelIntencitiesChange.bind(this));
 
     // Light
     var pointLight = new THREE.PointLight(0xffffff, 1000, 100);
@@ -48,7 +49,9 @@ function Composition(domContainer) {
     this._domContainer.addEventListener('drop', this._onDrop.bind(this));
     $('#load-mesh-button').click(this._onLoadMeshButtonClick.bind(this));
     $('#load-spots-button').click(this._onLoadSpotsButtonClick.bind(this));
-    $('#map-button').click(this._onMapButtonClick.bind(this));
+    $('#load-intensities-button').click(this._onLoadIntensitiesButtonClick.bind(this));
+    $('#intensity-selection').change(this._onIntensitiesSelectChange.bind(this));
+    this._onModelIntencitiesChange();
 
     var controls = new THREE.OrbitControls(this._camera, this._domContainer.querySelector('.canvas-container'));
     controls.target = this._scene.position;
@@ -93,6 +96,15 @@ Composition.prototype = {
         $('#status').text(this._model.getStatus());
     },
 
+    _onModelIntencitiesChange: function() {
+        var options = $('#intensity-selection');
+        options.empty();
+        $.each(this._model.getMeasureNames(), function() {
+            options.append($("<option />").val(this).text(this));
+        });
+        this._model.selectMeasure(options.val());
+    },
+
     _onDragEnter: function(event) {
         // TODO: Show drag visual effect.
     },
@@ -131,14 +143,19 @@ Composition.prototype = {
         this._openFile().then(this._model.loadSpots.bind(this._model));
     },
 
-    _onMapButtonClick: function() {
-        this._model.map();
+    _onLoadIntensitiesButtonClick: function() {
+        this._openFile().then(this._model.loadIntensities.bind(this._model));
+    },
+
+    _onIntensitiesSelectChange: function() {
+        var name = $('#intensity-selection').val();
+        this._model.selectMeasure(name);
     },
 };
 
-var g_composition;
+var g_model = new Model();
 
 $(function() {
-    g_composition = new Composition(document.body);
-    g_composition.resize();
+    var composition = new Composition(document.body, g_model);
+    composition.resize();
 });
