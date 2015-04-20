@@ -31,15 +31,13 @@ onmessage = function(e) {
 
         for (var j = 0; j < spots.length; j++) {
             var spot = spots[j];
-            var r = spot.Radii;
-            if (isNaN(r)) continue;
 
-            var dx = spot.X - x;
-            var dy = spot.Y - y;
-            var dz = spot.Z - z;
+            var dx = spot.x - x;
+            var dy = spot.y - y;
+            var dz = spot.z - z;
             var rsq = dx * dx + dy * dy + dz * dz;
 
-            if (rsq > r * r) continue;
+            if (rsq > spot.r * spot.r) continue;
 
             if (closestSpotIndex < 0 || rsq < closesSpotSquareDistance) {
                 closesSpotSquareDistance = rsq;
@@ -49,7 +47,7 @@ onmessage = function(e) {
 
         closestSpotIndeces[i] = closestSpotIndex;
         if (closestSpotIndex >= 0) {
-            closestSpotDistances[i] = Math.sqrt(closesSpotSquareDistance) / spots[closestSpotIndex].Radii;
+            closestSpotDistances[i] = Math.sqrt(closesSpotSquareDistance) / spots[closestSpotIndex].r;
             highlightedVerteces++;
         } else {
             closestSpotDistances[i] = 1.0;

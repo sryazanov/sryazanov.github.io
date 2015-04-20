@@ -11,10 +11,9 @@ function Composition(domContainer) {
     this._model.addEventListener('color-change', this.redraw.bind(this));
 
     // Light
-     var pointLight = new THREE.PointLight(0xffffff, 1000, 100);
+    var pointLight = new THREE.PointLight(0xffffff, 1000, 100);
     pointLight.position.set(-100, 100, 500);
     this._scene.add(pointLight);
-    // this._scene.add(new THREE.AmbientLight('#404040'));
 
     var directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(0, 1, 0);
