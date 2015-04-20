@@ -11,13 +11,25 @@ function Composition(domContainer) {
     this._model.addEventListener('color-change', this.redraw.bind(this));
 
     // Light
-    var spotLight = new THREE.PointLight( 0xffffff, 1, 100 );
-    spotLight.position.set(-40, 60, -10);
-    this._scene.add(spotLight);
-    this._scene.add(new THREE.AmbientLight('#404040'));
+     var pointLight = new THREE.PointLight(0xffffff, 1000, 100);
+    pointLight.position.set(-100, 100, 500);
+    this._scene.add(pointLight);
+    // this._scene.add(new THREE.AmbientLight('#404040'));
+
+    var directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(0, 1, 0);
+    this._scene.add(directionalLight);
+
+    var directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight.position.set( 0, -1, 0 );
+    this._scene.add( directionalLight );
 
     this._material = new THREE.MeshLambertMaterial({
-        vertexColors: THREE.VertexColors
+        vertexColors: THREE.VertexColors,
+        transparent: true,
+        opacity: 0.9,
+        shininess: 3,
+        shading: THREE.SmoothShading
     });
 
     // Configure scene

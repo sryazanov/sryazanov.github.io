@@ -7,6 +7,7 @@ function Model() {
     this._geometry = null;
     this._spots = null;
     this._mapping = null;
+    this._color = new THREE.Color('#001eb2');
     this._colorMap = new Model.JetColorMap();
 
     this._status = '';
@@ -112,7 +113,6 @@ Model.prototype = {
         var position = geometry.getAttribute('position');
         var positionCount = position.array.length / position.itemSize;
 
-        var defaultColor = new THREE.Color('#2020ff');
         var intencityColor = new THREE.Color('#ff0000');
         var currentColor = new THREE.Color();
 
@@ -123,7 +123,7 @@ Model.prototype = {
 
         for (var i = 0; i < positionCount; i++) {
             var index = mapping ? mapping.closestSpotIndeces[i] : -1;
-            currentColor.set(defaultColor);
+            currentColor.set(this._color);
             if (index >= 0) {
                 this._colorMap.map(intencityColor, intencity[index]);
                 var alpha = 1.0 - mapping.closestSpotDistances[i];
@@ -140,18 +140,6 @@ Model.prototype = {
 
         var endTime = new Date();
         console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
-    },
-
-    createColorMap: function() {
-        var points = ['#00007F', 'blue', '#007FFF','cyan', '#7FFF7F', 'yellow', '#FF7F00', 'red', '#7F0000'];
-
-        this._colorMap = new Array(1024);
-        for (var i = 0; i < this._colorMap.length; i++) {
-            var chunk = Math.cail(i * points.length / this._colorMap.length);
-            var color1 = new THREE.Color(points[chunk]);
-            var color2 = new THREE.Color(points[chunk + 1]);
-            var alpha = (i - chunk * points.length / this._colorMap.length);
-        }
     },
 
     _setStatus: function(status) {
