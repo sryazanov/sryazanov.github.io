@@ -1,7 +1,4 @@
 onmessage = function(e) {
-    console.log("Mapping");
-    var startTime = new Date();
-
     var positions = e.data.verteces;
     var spots = e.data.spots;
 
@@ -17,8 +14,8 @@ onmessage = function(e) {
             progress++;
             nextChunk = Math.ceil((progress + 1) * pointCount / 100);
             postMessage({
-                status: 'calculating',
-                progress: progress
+                status: 'working',
+                message: 'Mapping: ' + progress + '%',
             })
         }
         var positionOffset = i * 3;
@@ -54,14 +51,11 @@ onmessage = function(e) {
         }
     }
 
-    var endTime = new Date();
-    console.log('Processing time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
     console.log('Highlighted verteces: ' + highlightedVerteces);
 
     postMessage({
-        status: 'success',
+        status: 'completed',
         closestSpotIndeces: closestSpotIndeces,
         closestSpotDistances: closestSpotDistances,
-        processingTime: endTime.valueOf() - startTime.valueOf()
     });
 };

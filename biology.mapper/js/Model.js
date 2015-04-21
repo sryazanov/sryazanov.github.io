@@ -10,11 +10,23 @@ function Model() {
     this._mapping = null;
     this._color = new THREE.Color('#001eb2');
     this._colorMap = new Model.JetColorMap();
-    this._scaleFunction = Math.log;
+    this._scaleFunction = Model.Scale.LINEAR;
     this._hotspotQuantile = 0.995;
 
     this._status = '';
+    this._tasks = {};
 }
+
+Model.Scale = {
+    LOG: function(x) { return Math.log(1.0 + x); },
+    LINEAR: function(x) { return x; },
+};
+
+Model.TaskType = {
+    LOAD_MESH: { key: 'load-mesh', worker: 'MeshLoader.js' },
+    LOAD_MEASURES: { key: 'load-measures', worker: 'MeasuresLoader.js' },
+    MAP: { key: 'map', worker: 'Mapper.js' },
+};
 
 Model.prototype = {
     addEventListener: function(eventName, listener) {
@@ -34,16 +46,15 @@ Model.prototype = {
         this._notifyChange('geometry-change');
     },
 
-    getMeasureNames: function() {
-        return this._intensities ? this._intensities.measureNames : [];
+    getMeasures: function() {
+        return this._measures || [];
     },
 
     loadGeometry: function(file) {
-        if (this._geometryLoader) {
-            this._geometryLoader.cancel();
-        }
-        this._geometryLoader = this._loadFile(file, 'MeshLoader.js').then(function(result) {
-            this._geometryLoader = null;
+        this.setGeometry(null);
+        this._spots = null;
+        this._measures = null;
+        this._doTask(Model.TaskType.LOAD_MESH, file).then(function(result) {
             var geometry = new THREE.BufferGeometry();
             for (var name in event.data.attributes) {
                 var attribute = event.data.attributes[name];
@@ -55,108 +66,88 @@ Model.prototype = {
         }.bind(this));
     },
 
-    loadSpots: function(file) {
-        if (this._spotsLoader) {
-            this._spotsLoader.cancel();
-        }
-        this._spotsLoader = this._loadFile(file, 'SpotsLoader.js').then(function(result) {
-            this._spotsLoader = null;
-            if (result.data) {
-                this._spots = result.data;
-                this.map();
-            }
-        }.bind(this));
-    },
-
-    loadIntensities: function(file) {
-        if (this._intensitiesLoader) {
-            this._intensitiesLoader.terminate();
-        }
-        this._intensitiesLoader = this._loadFile(file, 'IntensitiesLoader.js').then(function(result) {
-            this._intensitiesLoader = null;
-            if (result.status == 'success') {
-                this._intensities = {
-                    measureNames: result.measureNames,
-                    measures: result.measures,
-                    spots: result.spots,
-                };
-                this._notifyChange('intensities-change');
-            }
+    loadMeasures: function(file) {
+        this._doTask(Model.TaskType.LOAD_MEASURES, file).then(function(result) {
+            this._spots = result.spots;
+            this._measures = result.measures;
+            this.map();
+            this._notifyChange('intensities-change');
         }.bind(this));
     },
 
     selectMeasure: function(name) {
-        if (!this._intensities) return;
+        if (!this._measures) return;
 
-        var measure = this._intensities.measures[name];
+        var measure = this._measures[name];
         if (!measure) return;
 
         // Apply the scale function.
-        measure = Array.prototype.map.call(measure, this._scaleFunction);
+        var values = Array.prototype.slice.call(measure.values, 0, this._spots.length);
+        values = values.map(this._scaleFunction);
 
-        // Create map from spot name to spot.
-        var spotsMap = this._spots.reduce(function(h, e) { h[e.name] = e; return h; }, {});
+        var max = values.slice().sort()[Math.ceil((values.length - 1) * this._hotspotQuantile )];
 
-        // Array of references to stops.
-        var spots = this._intensities.spots.map(function(x) {return spotsMap[x];});
-
-        var max = measure.slice().sort()[Math.ceil((measure.length - 1) * this._hotspotQuantile )];
-
-        for (var i = 0; i < measure.length; i++) {
-            spots[i].intensity = Math.min(1.0, measure[i] / max);
+        for (var i = 0; i < values.length; i++) {
+            this._spots[i].intensity = Math.min(1.0, values[i] / max);
         }
         this._recolor();
     },
 
     map: function() {
         if (!this._geometry || !this._spots) return;
-        if (this._mapper) {
-            this._mapper.cancel();
-        }
-
-        this._setStatus('Mapping...');
-        var geometry = this.getGeometry();
-        var worker = new Worker('js/workers/Mapper.js');
-        this._mapper = {
-            cancel: function() {
-                worker.terminate();
-            }
-        };
-        worker.postMessage({
-            verteces: geometry.getAttribute('original-position').array,
+        var arguments = {
+            verteces: this._geometry.getAttribute('original-position').array,
             spots: this._spots
-        });
-        worker.addEventListener('message', function(event) {
-            if (event.data.status == 'calculating') {
-                this._setStatus('Mapping: ' + event.data.progress + '%');
-            } else if (event.data.status = 'completed') {
-                this._mapping = {
+        };
+        this._doTask(Model.TaskType.MAP, arguments).then(function(results) {
+            this._mapping = {
                     closestSpotIndeces: event.data.closestSpotIndeces,
                     closestSpotDistances: event.data.closestSpotDistances
                 };
-                this._setStatus('Mapping completed.');
                 this._recolor();
                 this._mapper = null;
-                worker.terminate();
-            }
         }.bind(this));
     },
 
-    _loadFile: function(file, worker) {
-        var worker = new Worker('js/workers/' + worker);
-        var promise = new Promise(function(resolve, reject) {
-            worker.addEventListener('message', function(event) {
-                if (event.data.status == 'success') {
-                    resolve(event.data);
-                    worker.terminate();
-                }
-            });
-            worker.postMessage(file);
-        });
-        promise.cancel = function() {
-            worker.terminate();
+    _cancelTask: function(taskType) {
+        if (taskType.key in this._tasks) {
+            this._tasks[taskType.key].worker.terminate();
+            delete this._tasks[taskType.key];
+        }
+    },
+
+    _doTask: function(taskType, arguments) {
+        if (taskType.key in this._tasks) this._cancelTask(taskType);
+
+        var task = {
+            worker: new Worker('js/workers/' + taskType.worker),
+            status: '',
+            cancel: this._cancelTask.bind(this, taskType),
+            startTime: new Date().valueOf(),
         };
-        return promise;
+        this._tasks[taskType.key] = task;
+        var setStatus = this._setStatus.bind(this);
+
+        task.worker.postMessage(arguments);
+        return new Promise(function(resolve, reject) {
+            task.worker.onmessage = function(event) {
+                if (event.data.status == 'completed') {
+                    setStatus('');
+                    resolve(event.data);
+                    task.cancel();
+                    console.info('Task ' + taskType.key + ' completed in ' + (new Date().valueOf() - task.startTime) / 1000 + ' sec');
+                } else if (event.data.status == 'failed') {
+                    reject(event.data);
+                    task.cancel();
+                    alert('Operation failed: ' + event.message);
+                } else if (event.data.status == 'working') {
+                    setStatus(event.data.message);
+                }
+            };
+            task.worker.onerror = function(event) {
+                alert('Operation failed. See log for details.');
+            };
+        });
     },
 
     _recolor: function() {
@@ -165,6 +156,8 @@ Model.prototype = {
     },
 
     _recolorGeometry: function(geometry, mapping, spots) {
+        if (!geometry) return;
+
         var startTime = new Date();
 
         var position = geometry.getAttribute('position');

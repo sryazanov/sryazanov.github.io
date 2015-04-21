@@ -48,8 +48,7 @@ function Composition(domContainer, model) {
     this._domContainer.addEventListener('dragover', this._onDragOver.bind(this));
     this._domContainer.addEventListener('drop', this._onDrop.bind(this));
     $('#load-mesh-button').click(this._onLoadMeshButtonClick.bind(this));
-    $('#load-spots-button').click(this._onLoadSpotsButtonClick.bind(this));
-    $('#load-intensities-button').click(this._onLoadIntensitiesButtonClick.bind(this));
+    $('#load-measures-button').click(this._onLoadMeasuresButtonClick.bind(this));
     $('#intensity-selection').change(this._onIntensitiesSelectChange.bind(this));
     this._onModelIntencitiesChange();
 
@@ -99,8 +98,8 @@ Composition.prototype = {
     _onModelIntencitiesChange: function() {
         var options = $('#intensity-selection');
         options.empty();
-        $.each(this._model.getMeasureNames(), function() {
-            options.append($("<option />").val(this).text(this));
+        $.each(this._model.getMeasures(), function() {
+            options.append($("<option />").val(this.index).text(this.name));
         });
         this._model.selectMeasure(options.val());
     },
@@ -121,7 +120,15 @@ Composition.prototype = {
     _onDrop: function(event) {
         event.preventDefault();
         event.stopPropagation();
-        this._model.loadGeometry(event.dataTransfer.files[0]);
+        for (var i = 0; i < event.dataTransfer.files.length; i++) {
+            var file = event.dataTransfer.files[i];
+
+            if (/\.stl$/i.test(file.name)) {
+                this._model.loadGeometry(file);
+            } else if (/\.csv$/i.test(file.name)) {
+                this._model.loadMeasures(file);
+            }
+        }
     },
 
     _openFile: function() {
@@ -139,12 +146,8 @@ Composition.prototype = {
         this._openFile().then(this._model.loadGeometry.bind(this._model));
     },
 
-    _onLoadSpotsButtonClick: function() {
-        this._openFile().then(this._model.loadSpots.bind(this._model));
-    },
-
-    _onLoadIntensitiesButtonClick: function() {
-        this._openFile().then(this._model.loadIntensities.bind(this._model));
+    _onLoadMeasuresButtonClick: function() {
+        this._openFile().then(this._model.loadMeasures.bind(this._model));
     },
 
     _onIntensitiesSelectChange: function() {

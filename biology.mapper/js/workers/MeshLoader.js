@@ -26,7 +26,7 @@ function readContents(contents, fileName) {
     }
 
     postMessage({
-            status: 'success',
+            status: 'completed',
             attributes: attributes,
         });
 }
