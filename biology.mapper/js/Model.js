@@ -177,10 +177,14 @@ Model.prototype = {
         var values = Array.prototype.slice.call(this._activeMeasure.values, 0, this._spots.length);
         values = values.map(this._scaleFunction);
 
-        var max = values.slice().sort()[Math.ceil((values.length - 1) * this._hotspotQuantile )];
+        // Make a copy without NaNs and inifinities. Sort it.
+        var sorted = values.filter(function(x) { return x > -Infinity && x < Infinity; }).sort();
+        var min = sorted.length > 0 ? sorted[0] : NaN;
+        var max = sorted.length > 0 ? sorted[Math.ceil((values.length - 1) * this._hotspotQuantile)] : NaN;
 
         for (var i = 0; i < values.length; i++) {
-            this._spots[i].intensity = Math.min(1.0, values[i] / max);
+            var v = values[i];
+            this._spots[i].intensity = isNaN(v) || v == -Infinity ? NaN : Math.min(1.0, (v - min) / (max - min));
         }
         this._recolor();
     },
@@ -209,7 +213,7 @@ Model.prototype = {
         for (var i = 0; i < positionCount; i++) {
             var index = mapping ? mapping.closestSpotIndeces[i] : -1;
             currentColor.set(this._color);
-            if (index >= 0) {
+            if (index >= 0 && !isNaN(spots[index].intensity)) {
                 this._colorMap.map(intensityColor, spots[index].intensity);
                 var alpha = 1.0 - (1.0 - this._spotBorder) * mapping.closestSpotDistances[i];
                 alpha = alpha;
