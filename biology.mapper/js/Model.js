@@ -14,6 +14,7 @@ function Model() {
     this._colorMap = new Model.JetColorMap();
     this._scaleFunction = Model.Scale.LINEAR;
     this._hotspotQuantile = 0.995;
+    this._spotBorder = 0.05;
 
     this._status = '';
     this._tasks = {};
@@ -97,6 +98,19 @@ Model.prototype = {
         if (this._scaleFunction == value) return;
         this._scaleFunction = value;
         this._updateIntensities();
+    },
+
+    setColor: function(value) {
+        this._color = value;
+        this._recolor();
+    },
+
+    setSpotBorder: function(value) {
+        if (this._spotBorder == value) return;
+        if (value < 0.0) value = 0.0;
+        if (value > 1.0) value = 1.0;
+        this._spotBorder = value;
+        this._recolor();
     },
 
     map: function() {
@@ -197,7 +211,7 @@ Model.prototype = {
             currentColor.set(this._color);
             if (index >= 0) {
                 this._colorMap.map(intensityColor, spots[index].intensity);
-                var alpha = 1.0 - mapping.closestSpotDistances[i];
+                var alpha = 1.0 - (1.0 - this._spotBorder) * mapping.closestSpotDistances[i];
                 alpha = alpha;
                 currentColor.lerp(intensityColor, alpha);
             }
