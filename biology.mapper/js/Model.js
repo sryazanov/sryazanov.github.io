@@ -8,6 +8,8 @@ function Model() {
     this._geometry = null;
     this._spots = null;
     this._mapping = null;
+    this._measures = null;
+    this._activeMeasure = null;
     this._color = new THREE.Color('#001eb2');
     this._colorMap = new Model.JetColorMap();
     this._scaleFunction = Model.Scale.LINEAR;
@@ -70,6 +72,7 @@ Model.prototype = {
         this._doTask(Model.TaskType.LOAD_MEASURES, file).then(function(result) {
             this._spots = result.spots;
             this._measures = result.measures;
+            this._activeMeasure = null;
             this.map();
             this._notifyChange('intensities-change');
         }.bind(this));
@@ -78,19 +81,22 @@ Model.prototype = {
     selectMeasure: function(name) {
         if (!this._measures) return;
 
-        var measure = this._measures[name];
-        if (!measure) return;
+        this._activeMeasure = this._measures[name];
+        this._updateIntensities();
+    },
 
-        // Apply the scale function.
-        var values = Array.prototype.slice.call(measure.values, 0, this._spots.length);
-        values = values.map(this._scaleFunction);
+    setHotspotQuantile: function(value) {
+        if (this._hotspotQuantile == value) return;
+        if (value < 0.0) value = 0.0;
+        if (value > 1.0) value = 1.0;
+        this._hotspotQuantile = value;
+        this._updateIntensities();
+    },
 
-        var max = values.slice().sort()[Math.ceil((values.length - 1) * this._hotspotQuantile )];
-
-        for (var i = 0; i < values.length; i++) {
-            this._spots[i].intensity = Math.min(1.0, values[i] / max);
-        }
-        this._recolor();
+    setScaleFunction: function(value) {
+        if (this._scaleFunction == value) return;
+        this._scaleFunction = value;
+        this._updateIntensities();
     },
 
     map: function() {
@@ -148,6 +154,21 @@ Model.prototype = {
                 alert('Operation failed. See log for details.');
             };
         });
+    },
+
+    _updateIntensities: function() {
+        if (!this._activeMeasure || !this._spots) return;
+
+        // Apply the scale function.
+        var values = Array.prototype.slice.call(this._activeMeasure.values, 0, this._spots.length);
+        values = values.map(this._scaleFunction);
+
+        var max = values.slice().sort()[Math.ceil((values.length - 1) * this._hotspotQuantile )];
+
+        for (var i = 0; i < values.length; i++) {
+            this._spots[i].intensity = Math.min(1.0, values[i] / max);
+        }
+        this._recolor();
     },
 
     _recolor: function() {
