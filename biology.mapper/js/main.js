@@ -1,164 +1,108 @@
-function Composition(domContainer, model) {
-    this._domContainer = domContainer;
-    this._scene = new THREE.Scene();
-    this._camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-    this._renderer = new THREE.WebGLRenderer({antialias: true, canvas: this._domContainer.querySelector('canvas')});
-    this._mesh = null;
+var g_model;
+var g_view;
 
-    this._model = model;
-    this._model.addEventListener('geometry-change', this._onModelGeometryChange.bind(this));
-    this._model.addEventListener('status-change', this._onModelStatusChange.bind(this));
-    this._model.addEventListener('color-change', this.redraw.bind(this));
-    this._model.addEventListener('intensities-change', this._onModelIntencitiesChange.bind(this));
+function init() {
+    g_model = new Model();
+    g_view = new View3D(g_model, $('canvas')[0]);
 
-    // Light
-    var pointLight = new THREE.PointLight(0xffffff, 1000, 100);
-    pointLight.position.set(-100, 100, 500);
-    this._scene.add(pointLight);
+    g_model.addEventListener('status-change', onModelStatusChange);
+    g_model.addEventListener('intensities-change', onModelIntencitiesChange);
 
-    var directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(0, 1, 0);
-    this._scene.add(directionalLight);
+    window.addEventListener('resize', onResize);
 
-    var directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight.position.set( 0, -1, 0 );
-    this._scene.add( directionalLight );
+    $('#load-mesh-button').click(onLoadMeshButtonClick);
+    $('#load-intensities-button').click(onLoadIntensitiesButtonClick);
+    $('#intensity-selection').change(onIntensitiesSelectChange);
 
-    this._material = new THREE.MeshLambertMaterial({
-        vertexColors: THREE.VertexColors,
-        transparent: true,
-        opacity: 0.9,
-        shininess: 3,
-        shading: THREE.SmoothShading
-    });
+    for (var e in DragAndDrop) {
+        document.addEventListener(e, DragAndDrop[e], true);
+    }
 
-    // Configure scene
-    var axes = new THREE.AxisHelper(20);
-    this._scene.add(axes);
-
-    // Configure camera
-    this._camera.position.x = -30;
-    this._camera.position.y = 40;
-    this._camera.position.z = 30;
-    this._camera.lookAt(this._scene.position);
-
-    window.addEventListener('resize', this.resize.bind(this));
-    this._domContainer.addEventListener('dragenter', this._onDragEnter.bind(this));
-    this._domContainer.addEventListener('dragleave', this._onDragLeave.bind(this));
-    this._domContainer.addEventListener('dragover', this._onDragOver.bind(this));
-    this._domContainer.addEventListener('drop', this._onDrop.bind(this));
-    $('#load-mesh-button').click(this._onLoadMeshButtonClick.bind(this));
-    $('#load-intensities-button').click(this._onLoadIntensitiesButtonClick.bind(this));
-    $('#intensity-selection').change(this._onIntensitiesSelectChange.bind(this));
-    this._onModelIntencitiesChange();
-
-    var controls = new THREE.OrbitControls(this._camera, this._domContainer.querySelector('.canvas-container'));
-    controls.target = this._scene.position;
-    controls.update();
-    controls.addEventListener('change', this.redraw.bind(this));
-
-    this._model.setGeometry(new THREE.SphereGeometry(4, 20, 20));
-
-    this.fileLoader_ = null;
+    onResize();
 }
 
-Composition.prototype = {
-    resize: function() {
-        var container = this._domContainer.querySelector('.canvas-container');
-        var width = container.offsetWidth;
-        var height = container.offsetHeight;
+function onResize() {
+    var container = $('.canvas-container')[0];
+    var width = container.offsetWidth;
+    var height = container.offsetHeight;
 
-        this._camera.aspect = width / height;
-        this._camera.updateProjectionMatrix();
-        this._renderer.setSize(width, height);
+    if (g_view) g_view.resize(width, height);
+}
 
-        this.redraw();
+function onModelIntencitiesChange() {
+    var options = $('#intensity-selection');
+    options.empty();
+    $.each(g_model.getMeasures(), function() {
+        options.append($("<option />").val(this.index).text(this.name));
+    });
+    g_model.selectMeasure(options.val());
+}
+
+var DragAndDrop = {
+    _counter: 0,
+
+    dragenter: function(e) {
+        e.preventDefault();
+        if (++DragAndDrop._counter == 1)
+            $('#drop-target-informer').prop('hidden', false);
+        console.log(DragAndDrop._counter);
     },
 
-    redraw: function() {
-        this._renderer.render(this._scene, this._camera);
+    dragleave: function(e) {
+        e.preventDefault();
+        if (--DragAndDrop._counter === 0)
+            $('#drop-target-informer').prop('hidden', true);
+        console.log(DragAndDrop._counter);
     },
 
-    _onModelGeometryChange: function() {
-        if (this._mesh) {
-            this._scene.remove(this._mesh);
-        }
-        var geometry = this._model.getGeometry();
-        if (geometry) {
-            this._mesh = new THREE.Mesh(this._model.getGeometry(), this._material);
-            this._scene.add(this._mesh);
-        }
-        this.redraw();
+    dragover: function(e) {
+        e.preventDefault();
     },
 
-    _onModelStatusChange: function() {
-        $('#status').text(this._model.getStatus());
-    },
+    drop: function(e) {
+        DragAndDrop._counter = 0;
+        $('#drop-target-informer').prop('hidden', true);
 
-    _onModelIntencitiesChange: function() {
-        var options = $('#intensity-selection');
-        options.empty();
-        $.each(this._model.getMeasures(), function() {
-            options.append($("<option />").val(this.index).text(this.name));
-        });
-        this._model.selectMeasure(options.val());
-    },
-
-    _onDragEnter: function(event) {
-        // TODO: Show drag visual effect.
-    },
-
-    _onDragLeave: function(event) {
-        // TODO: Remove drag visual effect.
-    },
-
-    _onDragOver: function(event) {
-        // TODO: Add filtering by file type.
-        event.preventDefault();
-    },
-
-    _onDrop: function(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        for (var i = 0; i < event.dataTransfer.files.length; i++) {
-            var file = event.dataTransfer.files[i];
+        e.preventDefault();
+        e.stopPropagation();
+        for (var i = 0; i < e.dataTransfer.files.length; i++) {
+            var file = e.dataTransfer.files[i];
 
             if (/\.stl$/i.test(file.name)) {
-                this._model.loadGeometry(file);
+                g_model.loadMesh(file);
             } else if (/\.csv$/i.test(file.name)) {
-                this._model.loadMeasures(file);
+                g_model.loadIntensities(file);
             }
         }
-    },
-
-    _openFile: function() {
-        return new Promise(function(resolve) {
-            var fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.addEventListener('change', function() {
-                resolve(fileInput.files[0]);
-            });
-            fileInput.click();
-        });
-    },
-
-    _onLoadMeshButtonClick: function() {
-        this._openFile().then(this._model.loadGeometry.bind(this._model));
-    },
-
-    _onLoadIntensitiesButtonClick: function() {
-        this._openFile().then(this._model.loadMeasures.bind(this._model));
-    },
-
-    _onIntensitiesSelectChange: function() {
-        var name = $('#intensity-selection').val();
-        this._model.selectMeasure(name);
-    },
+    }
 };
 
-var g_model = new Model();
+function openFile() {
+    return new Promise(function(resolve) {
+        var fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.addEventListener('change', function() {
+            resolve(fileInput.files[0]);
+        });
+        fileInput.click();
+    });
+}
 
-$(function() {
-    var composition = new Composition(document.body, g_model);
-    composition.resize();
-});
+function onModelStatusChange() {
+    $('#status').text(g_model.getStatus());
+}
+
+function onLoadMeshButtonClick() {
+    openFile().then(g_model.loadMesh.bind(g_model));
+}
+
+function onLoadIntensitiesButtonClick() {
+    openFile().then(g_model.loadIntensities.bind(g_model));
+}
+
+function onIntensitiesSelectChange() {
+    var name = $('#intensity-selection').val();
+    g_model.selectMeasure(name);
+}
+
+$(init);

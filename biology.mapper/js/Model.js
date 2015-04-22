@@ -1,11 +1,12 @@
 function Model() {
     this._listeners = {
         'status-change': [],
-        'geometry-change': [],
+        'mesh-change': [],
         'color-change': [],
         'intensities-change': [],
     };
     this._geometry = null;
+    this._mesh = null;
     this._spots = null;
     this._mapping = null;
     this._measures = null;
@@ -15,6 +16,14 @@ function Model() {
     this._scaleFunction = Model.Scale.LINEAR;
     this._hotspotQuantile = 0.995;
     this._spotBorder = 0.05;
+
+    this._3DMaterial = new THREE.MeshLambertMaterial({
+        vertexColors: THREE.VertexColors,
+        transparent: true,
+        opacity: 0.9,
+        shininess: 3,
+        shading: THREE.SmoothShading
+    });
 
     this._status = '';
     this._tasks = {};
@@ -40,21 +49,16 @@ Model.prototype = {
         return this._status;
     },
 
-    getGeometry: function() {
-        return this._geometry;
-    },
-
-    setGeometry: function(geometry) {
-        this._geometry = geometry;
-        this._notifyChange('geometry-change');
+    getMesh: function() {
+        return this._mesh;
     },
 
     getMeasures: function() {
         return this._measures || [];
     },
 
-    loadGeometry: function(file) {
-        this.setGeometry(null);
+    loadMesh: function(file) {
+        this._setGeometry(null);
         this._spots = null;
         this._measures = null;
         this._doTask(Model.TaskType.LOAD_MESH, file).then(function(result) {
@@ -64,12 +68,12 @@ Model.prototype = {
                 geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
             }
             this._recolorGeometry(geometry, null, null);
-            this.setGeometry(geometry);
+            this._setGeometry(geometry);
             this.map();
         }.bind(this));
     },
 
-    loadMeasures: function(file) {
+    loadIntensities: function(file) {
         this._doTask(Model.TaskType.LOAD_MEASURES, file).then(function(result) {
             this._spots = result.spots;
             this._measures = result.measures;
@@ -123,9 +127,9 @@ Model.prototype = {
             this._mapping = {
                     closestSpotIndeces: event.data.closestSpotIndeces,
                     closestSpotDistances: event.data.closestSpotDistances
-                };
-                this._recolor();
-                this._mapper = null;
+            };
+            this._recolor();
+            this._mapper = null;
         }.bind(this));
     },
 
@@ -168,6 +172,12 @@ Model.prototype = {
                 alert('Operation failed. See log for details.');
             };
         });
+    },
+
+    _setGeometry: function(geometry) {
+        this._geometry = geometry;
+        this._mesh = geometry ? new THREE.Mesh(geometry, this._3DMaterial) : null;
+        this._notifyChange('mesh-change');
     },
 
     _updateIntensities: function() {
@@ -229,6 +239,59 @@ Model.prototype = {
 
         var endTime = new Date();
         console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
+    },
+
+    _generate2DGeometryAndMapping: function() {
+        if (!this._spots) return;
+
+        this._mapping = {
+            closestSpotIndeces: new Int32Array(this._spots.length * 2),
+            closestSpotDistances: new Int32Array(this._spots.length * 2),
+        };
+
+        // Generate 2 triangles around each spot with center at the center of the spot and
+        // side size of 2*r.
+        var positions = new Float32Array(this._spots.length * 18);
+        for (var i = 0; i < this._spots.length; i++) {
+            var spot = this._spots[i];
+            positions[i * 18 + 0] = spot.x - spot.r;
+            positions[i * 18 + 1] = spot.y - spot.r;
+            positions[i * 18 + 2] = 0.0;
+
+            positions[i * 18 + 3] = spot.x + spot.r;
+            positions[i * 18 + 4] = spot.y - spot.r;
+            positions[i * 18 + 5] = 0.0;
+
+            positions[i * 18 + 6] = spot.x - spot.r;
+            positions[i * 18 + 7] = spot.y + spot.r;
+            positions[i * 18 + 8] = 0.0;
+
+            positions[i * 18 + 9] = spot.x + spot.r;
+            positions[i * 18 + 10] = spot.y + spot.r;
+            positions[i * 18 + 11] = 0.0;
+
+            positions[i * 18 + 12] = spot.x - spot.r;
+            positions[i * 18 + 13] = spot.y + spot.r;
+            positions[i * 18 + 14] = 0.0;
+
+            positions[i * 18 + 15] = spot.x + spot.r;
+            positions[i * 18 + 16] = spot.y - spot.r;
+            positions[i * 18 + 17] = 0.0;
+
+            this._mapping.closestSpotIndeces[i * 2 + 0] = i;
+            this._mapping.closestSpotIndeces[i * 2 + 1] = i;
+            this._mapping.closestSpotDistances[i * 2 + 0] = 0.0;
+            this._mapping.closestSpotDistances[i * 2 + 1] = 0.0;
+        }
+
+        for (var i = 0; i < positions.length; i++) {
+            positions[i] /= 10;
+        }
+
+        var geometry = new THREE.BufferGeometry();
+        geometry.addAttribute('position', new THREE.BufferAttribute(positions, 3));
+        this._recolorGeometry(geometry, this._mapping, this._spots);
+        this._setGeometry(geometry);
     },
 
     _setStatus: function(status) {
