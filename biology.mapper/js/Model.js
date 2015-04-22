@@ -33,7 +33,7 @@ Model.TaskType = {
 
 Model.prototype = {
     addEventListener: function(eventName, listener) {
-        this._listeners[eventName].push(listener)
+        this._listeners[eventName].push(listener);
     },
 
     getStatus: function() {
@@ -115,11 +115,11 @@ Model.prototype = {
 
     map: function() {
         if (!this._geometry || !this._spots) return;
-        var arguments = {
+        var args = {
             verteces: this._geometry.getAttribute('original-position').array,
             spots: this._spots
         };
-        this._doTask(Model.TaskType.MAP, arguments).then(function(results) {
+        this._doTask(Model.TaskType.MAP, args).then(function(results) {
             this._mapping = {
                     closestSpotIndeces: event.data.closestSpotIndeces,
                     closestSpotDistances: event.data.closestSpotDistances
@@ -136,7 +136,7 @@ Model.prototype = {
         }
     },
 
-    _doTask: function(taskType, arguments) {
+    _doTask: function(taskType, args) {
         if (taskType.key in this._tasks) this._cancelTask(taskType);
 
         var task = {
@@ -148,7 +148,7 @@ Model.prototype = {
         this._tasks[taskType.key] = task;
         var setStatus = this._setStatus.bind(this);
 
-        task.worker.postMessage(arguments);
+        task.worker.postMessage(args);
         return new Promise(function(resolve, reject) {
             task.worker.onmessage = function(event) {
                 if (event.data.status == 'completed') {

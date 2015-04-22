@@ -16,7 +16,7 @@ onmessage = function(e) {
             postMessage({
                 status: 'working',
                 message: 'Mapping: ' + progress + '%',
-            })
+            });
         }
         var positionOffset = i * 3;
         var x = positions[positionOffset + 0];
@@ -24,7 +24,7 @@ onmessage = function(e) {
         var z = positions[positionOffset + 2];
 
         var closestSpotIndex = -1;
-        var closesSpotSquareDistance = undefined;
+        var closesSpotSquareDistance;
 
         for (var j = 0; j < spots.length; j++) {
             var spot = spots[j];

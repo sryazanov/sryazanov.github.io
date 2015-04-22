@@ -17,7 +17,7 @@ function Handler() {
 
 Handler.prototype = {
     _step: function(results, parser) {
-        if (++this._row == 0) {
+        if (++this._row === 0) {
             this._handleHeader(results.data[0]);
             return;
         }
@@ -29,7 +29,7 @@ Handler.prototype = {
         }
 
         var row = results.data[0];
-        if (row.length == 1 && row[0] == '') return; // Ignore empty lines
+        if (row.length == 1 && row[0] === '') return; // Ignore empty lines
         if (row.length < 5 + this.measures.length) {
             parser.abort();
             this._reportError('Too few elements');
@@ -54,7 +54,7 @@ Handler.prototype = {
 
         this.spots.push(spot);
 
-        if (this._row % 10 == 0) this._reportProgress();
+        if (this._row % 10 ===0) this._reportProgress();
     },
 
     _handleHeader: function(header) {
