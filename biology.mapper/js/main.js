@@ -48,7 +48,7 @@ function Composition(domContainer, model) {
     this._domContainer.addEventListener('dragover', this._onDragOver.bind(this));
     this._domContainer.addEventListener('drop', this._onDrop.bind(this));
     $('#load-mesh-button').click(this._onLoadMeshButtonClick.bind(this));
-    $('#load-measures-button').click(this._onLoadMeasuresButtonClick.bind(this));
+    $('#load-intensities-button').click(this._onLoadIntensitiesButtonClick.bind(this));
     $('#intensity-selection').change(this._onIntensitiesSelectChange.bind(this));
     this._onModelIntencitiesChange();
 
@@ -146,7 +146,7 @@ Composition.prototype = {
         this._openFile().then(this._model.loadGeometry.bind(this._model));
     },
 
-    _onLoadMeasuresButtonClick: function() {
+    _onLoadIntensitiesButtonClick: function() {
         this._openFile().then(this._model.loadMeasures.bind(this._model));
     },
 
