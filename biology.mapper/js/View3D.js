@@ -1,4 +1,5 @@
 function View3D(model, canvas) {
+    this._canvas = canvas;
     this._renderer = new THREE.WebGLRenderer({
         antialias: true,
         canvas: canvas
@@ -61,6 +62,7 @@ View3D.prototype = {
             this._mesh = mesh;
             this._scene.add(mesh);
         }
+        this._canvas.hidden = !mesh;
         this.redraw();
     },
 };

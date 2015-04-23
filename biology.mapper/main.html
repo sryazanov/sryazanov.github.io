@@ -11,8 +11,9 @@
   <script src="js/main.js"></script>
 </head>
 <body>
-<div class="canvas-container">
-<canvas></canvas>
+<div id="view-container">
+<canvas hidden></canvas>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink= "http://www.w3.org/1999/xlink"></svg>
 </div>
 <div class="footage">
 <input id="load-mesh-button" type="button" value="Load mesh">
@@ -20,8 +21,6 @@
 <select id="intensity-selection"></select>
 <span id="status"></scpan>
 </div>
-<div id="drop-target-informer" hidden>
-<div class="message">Drop files here</div>
-</div>
+<div id="drop-target-informer" hidden><div class="message">Drop files here</div></div>
 </body>
 </html>

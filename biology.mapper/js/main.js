@@ -1,9 +1,10 @@
 var g_model;
-var g_view;
+var g_views = {};
 
 function init() {
     g_model = new Model();
-    g_view = new View3D(g_model, $('canvas')[0]);
+    g_views.v3D = new View3D(g_model, $('#view-container > canvas')[0]);
+    g_views.v2D = new View2D(g_model, $('#view-container > svg')[0]);
 
     g_model.addEventListener('status-change', onModelStatusChange);
     g_model.addEventListener('intensities-change', onModelIntencitiesChange);
@@ -22,11 +23,13 @@ function init() {
 }
 
 function onResize() {
-    var container = $('.canvas-container')[0];
+    var container = $('#view-container')[0];
     var width = container.offsetWidth;
     var height = container.offsetHeight;
 
-    if (g_view) g_view.resize(width, height);
+    for (name in g_views) {
+        g_views[name].resize(width, height);
+    }
 }
 
 function onModelIntencitiesChange() {
@@ -45,14 +48,12 @@ var DragAndDrop = {
         e.preventDefault();
         if (++DragAndDrop._counter == 1)
             $('#drop-target-informer').prop('hidden', false);
-        console.log(DragAndDrop._counter);
     },
 
     dragleave: function(e) {
         e.preventDefault();
         if (--DragAndDrop._counter === 0)
             $('#drop-target-informer').prop('hidden', true);
-        console.log(DragAndDrop._counter);
     },
 
     dragover: function(e) {
@@ -65,15 +66,27 @@ var DragAndDrop = {
 
         e.preventDefault();
         e.stopPropagation();
-        for (var i = 0; i < e.dataTransfer.files.length; i++) {
-            var file = e.dataTransfer.files[i];
 
-            if (/\.stl$/i.test(file.name)) {
-                g_model.loadMesh(file);
+        var handlers = DragAndDrop._findHandlers(e.dataTransfer.files);
+        for (var i = 0; i < handlers.length; i++) {
+            handlers[i]();
+        }
+    },
+
+    _findHandlers: function(files) {
+        var result = [];
+        for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+
+            if ((/\.png$/i.test(file.name))) {
+                result.push(g_model.loadImage.bind(g_model, file));
+            } else if (/\.stl$/i.test(file.name)) {
+                result.push(g_model.loadMesh.bind(g_model, file));
             } else if (/\.csv$/i.test(file.name)) {
-                g_model.loadIntensities(file);
+                result.push(g_model.loadIntensities.bind(g_model, file));
             }
         }
+        return result;
     }
 };
 

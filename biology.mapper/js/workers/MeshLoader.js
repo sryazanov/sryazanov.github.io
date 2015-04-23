@@ -2,14 +2,13 @@ importScripts('../lib/three.min.js', '../lib/STLLoader.js');
 
 onmessage = function(e) {
     var file = e.data;
+    var reader = new FileReader();
     reader.addEventListener('load', function(event) {
         // TODO: handle errors.
         readContents(event.target.result);
     });
     reader.readAsArrayBuffer(e.data);
 };
-
-var reader = new FileReader();
 
 function readContents(contents, fileName) {
     var geometry = new THREE.STLLoader().parse(contents);

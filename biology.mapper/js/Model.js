@@ -2,6 +2,7 @@ function Model() {
     this._listeners = {
         'status-change': [],
         'mesh-change': [],
+        'graphics-change': [],
         'color-change': [],
         'intensities-change': [],
     };
@@ -10,6 +11,7 @@ function Model() {
     this._spots = null;
     this._mapping = null;
     this._measures = null;
+    this._image = null;
     this._activeMeasure = null;
     this._color = new THREE.Color('#001eb2');
     this._colorMap = new Model.JetColorMap();
@@ -35,6 +37,7 @@ Model.Scale = {
 };
 
 Model.TaskType = {
+    LOAD_IMAGE: { key: 'load-image', worker: 'ImageLoader.js' },
     LOAD_MESH: { key: 'load-mesh', worker: 'MeshLoader.js' },
     LOAD_MEASURES: { key: 'load-measures', worker: 'MeasuresLoader.js' },
     MAP: { key: 'map', worker: 'Mapper.js' },
@@ -57,8 +60,57 @@ Model.prototype = {
         return this._measures || [];
     },
 
+    buildSVG: function(document) {
+        if (!this._image) return null;
+        var SVGNS = 'http://www.w3.org/2000/svg';
+        var groupElement = document.createElementNS(SVGNS, 'g');
+        var imageElement = document.createElementNS(SVGNS, 'image');
+        groupElement.appendChild(imageElement);
+
+        var defsElement = document.createElementNS(SVGNS, 'defs');
+        defsElement.innerHTML = '<radialGradient id="spot-gradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">' +
+                                '<stop offset="0%" style="stop-opacity:1" />' +
+                                '<stop offset="100%" style="stop-opacity:0" />' +
+                                '</radialGradient>';
+        groupElement.appendChild(defsElement);
+
+        var spotsGroupElement = document.createElementNS(SVGNS, 'g');
+        var labelsGroupElement = document.createElementNS(SVGNS, 'g');
+        groupElement.appendChild(spotsGroupElement);
+        groupElement.appendChild(labelsGroupElement);
+
+
+        // Create an image to detect size of the element.
+        var image = new Image();
+        image.src = this._image.url;
+        image.onload = function(event) {
+            imageElement.setAttribute('width', image.width + 'px');
+            imageElement.setAttribute('height', image.height + 'px');
+            imageElement.setAttributeNS('http://www.w3.org/1999/xlink', 'href', image.src);
+            image.src = '';
+        };
+
+        if (this._spots) {
+            this._createSVGSpots(spotsGroupElement, labelsGroupElement);
+        }
+
+        return groupElement;
+    },
+
+    loadImage: function(file) {
+        this._setGeometry(null);
+        this._cancelTask(Model.TaskType.LOAD_MESH);
+        // this._spots = null;
+        // this._measures = null;
+        this._doTask(Model.TaskType.LOAD_IMAGE, file).then(function(result) {
+            this._setImage(result.blob);
+        }.bind(this));
+    },
+
     loadMesh: function(file) {
         this._setGeometry(null);
+        this._setImage(null);
+        this._cancelTask(Model.TaskType.LOAD_IMAGE);
         this._spots = null;
         this._measures = null;
         this._doTask(Model.TaskType.LOAD_MESH, file).then(function(result) {
@@ -68,7 +120,7 @@ Model.prototype = {
                 geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
             }
             this._recolorGeometry(geometry, null, null);
-            this._setGeometry(geometry);
+            this._setGeometry(geometry, this._3DMaterial);
             this.map();
         }.bind(this));
     },
@@ -78,7 +130,10 @@ Model.prototype = {
             this._spots = result.spots;
             this._measures = result.measures;
             this._activeMeasure = null;
-            this.map();
+            if (this._mesh)
+                this.map();
+            else if (this._image)
+                this._notifyChange('graphics-change');
             this._notifyChange('intensities-change');
         }.bind(this));
     },
@@ -133,6 +188,30 @@ Model.prototype = {
         }.bind(this));
     },
 
+    _createSVGSpots: function(spotsGrpupElement, lablesGroupElement) {
+        var SVGNS = 'http://www.w3.org/2000/svg';
+
+        var document = spotsGrpupElement.ownerDocument;
+
+        for (var i = 0; i < this._spots.length; i++) {
+            var spot = this._spots[i];
+            var spotElement = document.createElementNS(SVGNS, 'ellipse');
+            spotElement.setAttribute('rx', spot.r + 'px');
+            spotElement.setAttribute('ry', spot.r + 'px');
+            spotElement.setAttribute('cx', spot.x + 'px');
+            spotElement.setAttribute('cy', spot.y + 'px');
+            spotElement.setAttribute('style', 'fill:url(#spot-gradient)');
+
+            spotsGrpupElement.appendChild(spotElement);
+
+            var labelElement = document.createElementNS(SVGNS, 'text');
+            labelElement.textContent = spot.name;
+            labelElement.setAttribute('x', (spot.x + 5) + 'px');
+            labelElement.setAttribute('y', spot.y + 'px');
+            lablesGroupElement.appendChild(labelElement);
+        }
+    },
+
     _cancelTask: function(taskType) {
         if (taskType.key in this._tasks) {
             this._tasks[taskType.key].worker.terminate();
@@ -174,10 +253,26 @@ Model.prototype = {
         });
     },
 
-    _setGeometry: function(geometry) {
+    _setGeometry: function(geometry, material) {
         this._geometry = geometry;
-        this._mesh = geometry ? new THREE.Mesh(geometry, this._3DMaterial) : null;
+        this._mesh = geometry ? new THREE.Mesh(geometry, material) : null;
         this._notifyChange('mesh-change');
+    },
+
+    _setImage: function(blob) {
+        var urlCreator = window.URL || window.webkitURL;
+        if (this._image) {
+            urlCreator.revokeObjectURL(this._image.url);
+        }
+        if (blob) {
+            this._image = {
+                blob: blob,
+                url: urlCreator.createObjectURL(blob),
+            };
+        } else {
+            this._image = null;
+        }
+        this._notifyChange('graphics-change');
     },
 
     _updateIntensities: function() {
@@ -239,59 +334,6 @@ Model.prototype = {
 
         var endTime = new Date();
         console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
-    },
-
-    _generate2DGeometryAndMapping: function() {
-        if (!this._spots) return;
-
-        this._mapping = {
-            closestSpotIndeces: new Int32Array(this._spots.length * 2),
-            closestSpotDistances: new Int32Array(this._spots.length * 2),
-        };
-
-        // Generate 2 triangles around each spot with center at the center of the spot and
-        // side size of 2*r.
-        var positions = new Float32Array(this._spots.length * 18);
-        for (var i = 0; i < this._spots.length; i++) {
-            var spot = this._spots[i];
-            positions[i * 18 + 0] = spot.x - spot.r;
-            positions[i * 18 + 1] = spot.y - spot.r;
-            positions[i * 18 + 2] = 0.0;
-
-            positions[i * 18 + 3] = spot.x + spot.r;
-            positions[i * 18 + 4] = spot.y - spot.r;
-            positions[i * 18 + 5] = 0.0;
-
-            positions[i * 18 + 6] = spot.x - spot.r;
-            positions[i * 18 + 7] = spot.y + spot.r;
-            positions[i * 18 + 8] = 0.0;
-
-            positions[i * 18 + 9] = spot.x + spot.r;
-            positions[i * 18 + 10] = spot.y + spot.r;
-            positions[i * 18 + 11] = 0.0;
-
-            positions[i * 18 + 12] = spot.x - spot.r;
-            positions[i * 18 + 13] = spot.y + spot.r;
-            positions[i * 18 + 14] = 0.0;
-
-            positions[i * 18 + 15] = spot.x + spot.r;
-            positions[i * 18 + 16] = spot.y - spot.r;
-            positions[i * 18 + 17] = 0.0;
-
-            this._mapping.closestSpotIndeces[i * 2 + 0] = i;
-            this._mapping.closestSpotIndeces[i * 2 + 1] = i;
-            this._mapping.closestSpotDistances[i * 2 + 0] = 0.0;
-            this._mapping.closestSpotDistances[i * 2 + 1] = 0.0;
-        }
-
-        for (var i = 0; i < positions.length; i++) {
-            positions[i] /= 10;
-        }
-
-        var geometry = new THREE.BufferGeometry();
-        geometry.addAttribute('position', new THREE.BufferAttribute(positions, 3));
-        this._recolorGeometry(geometry, this._mapping, this._spots);
-        this._setGeometry(geometry);
     },
 
     _setStatus: function(status) {
