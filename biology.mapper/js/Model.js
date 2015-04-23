@@ -68,10 +68,6 @@ Model.prototype = {
         groupElement.appendChild(imageElement);
 
         var defsElement = document.createElementNS(SVGNS, 'defs');
-        defsElement.innerHTML = '<radialGradient id="spot-gradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">' +
-                                '<stop offset="0%" style="stop-opacity:1" />' +
-                                '<stop offset="100%" style="stop-opacity:0" />' +
-                                '</radialGradient>';
         groupElement.appendChild(defsElement);
 
         var spotsGroupElement = document.createElementNS(SVGNS, 'g');
@@ -91,7 +87,8 @@ Model.prototype = {
         };
 
         if (this._spots) {
-            this._createSVGSpots(spotsGroupElement, labelsGroupElement);
+            this._createSVGSpots(spotsGroupElement, labelsGroupElement, defsElement);
+            this.recolorSVG(groupElement);
         }
 
         return groupElement;
@@ -188,26 +185,38 @@ Model.prototype = {
         }.bind(this));
     },
 
-    _createSVGSpots: function(spotsGrpupElement, lablesGroupElement) {
+    _createSVGSpots: function(spotsGrpupElement, lablesGroupElement, defsElement) {
         var SVGNS = 'http://www.w3.org/2000/svg';
 
         var document = spotsGrpupElement.ownerDocument;
 
         for (var i = 0; i < this._spots.length; i++) {
             var spot = this._spots[i];
-            var spotElement = document.createElementNS(SVGNS, 'ellipse');
-            spotElement.setAttribute('rx', spot.r + 'px');
-            spotElement.setAttribute('ry', spot.r + 'px');
-            spotElement.setAttribute('cx', spot.x + 'px');
-            spotElement.setAttribute('cy', spot.y + 'px');
-            spotElement.setAttribute('style', 'fill:url(#spot-gradient)');
 
+            var gradientElement = document.createElementNS(SVGNS, 'radialGradient');
+            gradientElement.cx.baseVal = "50%";
+            gradientElement.cy.baseVal = "50%";
+            gradientElement.r.baseVal = "50%";
+            gradientElement.fx.baseVal = "50%";
+            gradientElement.fy.baseVal = "50%";
+            gradientElement.id = "spot" + i;
+
+            gradientElement.innerHTML = '<stop offset="0%" />' +
+                                        '<stop offset="100%" />';
+            defsElement.appendChild(gradientElement);
+
+            var spotElement = document.createElementNS(SVGNS, 'ellipse');
+            spotElement.rx.baseVal.value = spot.r;
+            spotElement.ry.baseVal.value = spot.r;
+            spotElement.cx.baseVal.value = spot.x;
+            spotElement.cy.baseVal.value = spot.y;
+            spotElement.style.fill = 'url(#spot' + i + ')';
             spotsGrpupElement.appendChild(spotElement);
 
             var labelElement = document.createElementNS(SVGNS, 'text');
             labelElement.textContent = spot.name;
-            labelElement.setAttribute('x', (spot.x + 5) + 'px');
-            labelElement.setAttribute('y', spot.y + 'px');
+            labelElement.x.baseVal.value = spot.x + 5;
+            labelElement.y.baseVal.value = spot.y;
             lablesGroupElement.appendChild(labelElement);
         }
     },
@@ -295,8 +304,36 @@ Model.prototype = {
     },
 
     _recolor: function() {
-        this._recolorGeometry(this._geometry, this._mapping, this._spots);
+        if (this._geometry) {
+            this._recolorGeometry(this._geometry, this._mapping, this._spots);
+        }
         this._notifyChange('color-change');
+    },
+
+    recolorSVG: function(svg) {
+        var startTime = new Date();
+
+        var gradients = svg.getElementsByTagName('radialGradient');
+        var intensityColor = new THREE.Color();
+        for (var i = 0; i < gradients.length; i++) {
+            var g = gradients[i];
+            var stop0 = gradients[i].children[0];
+            var stop1 = gradients[i].children[1];
+
+            var spot = this._spots[i];
+            if (spot && !isNaN(spot.intensity)) {
+                this._colorMap.map(intensityColor, spot.intensity);
+                stop0.style.stopColor = stop1.style.stopColor = intensityColor.getStyle();
+                stop0.style.stopOpacity = 1.0;
+                stop1.style.stopOpacity = this._spotBorder;
+            } else {
+                stop0.style.stopColor = stop1.style.stopColor = '';
+                stop0.style.stopOpacity = stop1.style.stopOpacity = 0;
+            }
+        }
+
+        var endTime = new Date();
+        console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
     },
 
     _recolorGeometry: function(geometry, mapping, spots) {

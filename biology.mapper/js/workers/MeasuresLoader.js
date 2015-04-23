@@ -41,6 +41,7 @@ Handler.prototype = {
             y: Number(row[2]),
             z: Number(row[3]),
             r: Number(row[4]),
+            intensity: NaN,
         };
         if (isNaN(spot.x) || isNaN(spot.y) || isNaN(spot.y) || isNaN(spot.z) || isNaN(spot.r)) {
             parser.abort();
