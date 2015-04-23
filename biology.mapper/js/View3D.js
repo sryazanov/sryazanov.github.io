@@ -49,6 +49,7 @@ View3D.prototype = {
     resize: function(width, height) {
         this._camera.aspect = width / height;
         this._camera.updateProjectionMatrix();
+        this._renderer.setPixelRatio(devicePixelRatio);
         this._renderer.setSize(width, height);
         this.redraw();
     },
