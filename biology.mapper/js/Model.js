@@ -37,8 +37,8 @@ Model.Scale = {
 };
 
 Model.TaskType = {
-    LOAD_IMAGE: { key: 'load-image', worker: 'ImageLoader.js' },
-    LOAD_MESH: { key: 'load-mesh', worker: 'MeshLoader.js' },
+    LOAD_IMAGE: { key: 'load-image', worker: null },
+    LOAD_MESH: { key: 'load-mesh', worker: 'MesgLoader.js' },
     LOAD_MEASURES: { key: 'load-measures', worker: 'MeasuresLoader.js' },
     MAP: { key: 'map', worker: 'Mapper.js' },
 };
@@ -60,11 +60,18 @@ Model.prototype = {
         return this._measures || [];
     },
 
+    getImageSize: function() {
+        return this._image && {width: this._image.width, height: this._image.height};
+    },
+
     buildSVG: function(document) {
         if (!this._image) return null;
         var SVGNS = 'http://www.w3.org/2000/svg';
         var groupElement = document.createElementNS(SVGNS, 'g');
         var imageElement = document.createElementNS(SVGNS, 'image');
+        imageElement.href.baseVal = this._image.url;
+        imageElement.width.baseVal.value = this._image.width;
+        imageElement.height.baseVal.value = this._image.height;
         groupElement.appendChild(imageElement);
 
         var defsElement = document.createElementNS(SVGNS, 'defs');
@@ -74,17 +81,6 @@ Model.prototype = {
         var labelsGroupElement = document.createElementNS(SVGNS, 'g');
         groupElement.appendChild(spotsGroupElement);
         groupElement.appendChild(labelsGroupElement);
-
-
-        // Create an image to detect size of the element.
-        var image = new Image();
-        image.src = this._image.url;
-        image.onload = function(event) {
-            imageElement.setAttribute('width', image.width + 'px');
-            imageElement.setAttribute('height', image.height + 'px');
-            imageElement.setAttributeNS('http://www.w3.org/1999/xlink', 'href', image.src);
-            image.src = '';
-        };
 
         if (this._spots) {
             this._createSVGSpots(spotsGroupElement, labelsGroupElement, defsElement);
@@ -100,7 +96,7 @@ Model.prototype = {
         // this._spots = null;
         // this._measures = null;
         this._doTask(Model.TaskType.LOAD_IMAGE, file).then(function(result) {
-            this._setImage(result.blob);
+            this._setImage(result.url, result.width, result.height);
         }.bind(this));
     },
 
@@ -232,7 +228,8 @@ Model.prototype = {
         if (taskType.key in this._tasks) this._cancelTask(taskType);
 
         var task = {
-            worker: new Worker('js/workers/' + taskType.worker),
+            worker: typeof taskType.worker == 'function' ?
+                    new taskType.worker() : new Worker('js/workers/' + taskType.worker),
             status: '',
             cancel: this._cancelTask.bind(this, taskType),
             startTime: new Date().valueOf(),
@@ -268,15 +265,15 @@ Model.prototype = {
         this._notifyChange('mesh-change');
     },
 
-    _setImage: function(blob) {
-        var urlCreator = window.URL || window.webkitURL;
+    _setImage: function(url, width, height) {
         if (this._image) {
-            urlCreator.revokeObjectURL(this._image.url);
+            URL.revokeObjectURL(this._image.url);
         }
-        if (blob) {
+        if (url) {
             this._image = {
-                blob: blob,
-                url: urlCreator.createObjectURL(blob),
+                url: url,
+                width: width,
+                height: height,
             };
         } else {
             this._image = null;
@@ -419,4 +416,56 @@ Model.JetColorMap = function() {
 
 Model.JetColorMap.prototype = {
     __proto__: Model.ColorMap.prototype
+};
+
+Model.ImageLoader = function() {
+    this.onmessage = null;
+    this._reader = new FileReader();
+    this._reader.onload = this._onFileLoad.bind(this);
+    this._image = new Image();
+    this._image.onload = this._onImageLoad.bind(this);
+    this._terminated = false;
+    this._url = null;
+    this._fileType = null;
+};
+
+Model.TaskType.LOAD_IMAGE.worker = Model.ImageLoader;
+
+Model.ImageLoader.prototype = {
+    terminate: function() {
+        this._terminated = true;
+        this._reader.abort();
+        if (this._url) {
+            URL.revokeObjectURL(this._url);
+            this._url = null;
+        }
+    },
+
+    postMessage: function(file) {
+        this._fileType = file.type;
+        this._reader.readAsArrayBuffer(file);
+    },
+
+    _send: function(message) {
+        if (!this._terminated || this.onmessage)
+            this.onmessage({data: message});
+    },
+
+    _onFileLoad: function(event) {
+        var blob = new Blob([event.target.result], {type: this._fileType});
+        this._url = URL.createObjectURL(blob);
+        this._image.src = this._url;
+    },
+
+    _onImageLoad: function(event) {
+        var url = this._url;
+        this._url = null; // Ownership transfered.
+        this._send({
+                status: 'completed',
+                url: url,
+                width: this._image.width,
+                height: this._image.height
+        });
+        this._image.src = '';
+    },
 };

@@ -3,6 +3,9 @@
 function View2D(model, svg) {
     this._svg = svg;
     this._graphics = null;
+    this._width = 0;
+    this._height = 0;
+    this._scale = 1.0;
 
     // Binding with model.
     this._model = model;
@@ -16,6 +19,10 @@ View2D.prototype = {
     resize: function(width, height) {
         this._svg.style.width = width + 'px';
         this._svg.style.height = height + 'px';
+        this._width = width;
+        this._height = height;
+        if (this._graphics)
+            this._reposition();
     },
 
     _onModelGraphicsChange: function() {
@@ -23,9 +30,19 @@ View2D.prototype = {
             this._svg.removeChild(this._graphics);
         }
         var graphics = this._model.buildSVG(this._svg.ownerDocument);
-        if (graphics) this._svg.appendChild(graphics);
         this._graphics = graphics;
+        if (graphics) {
+            this._reposition();
+            this._svg.appendChild(graphics);
+        }
         this._svg.style.display = graphics ? '' : 'none';
+    },
+
+    _reposition: function() {
+        var imageSize = this._model.getImageSize();
+        var x = (this._width - imageSize.width * this._scale) / 2;
+        var y = (this._height - imageSize.height * this._scale) / 2;
+        this._graphics.setAttribute('transform', 'translate(' + x + ', ' + y + ') scale(' + this._scale + ')');
     },
 
     _onModelColorChange: function() {
