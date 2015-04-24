@@ -50,7 +50,8 @@ Handler.prototype = {
         }
 
         for (j = 0; j < this.measures.length; j++) {
-            this.measures[j].values[this.spots.length] = Number(row[j + 5]);
+            var value = row[j + 5];
+            this.measures[j].values[this.spots.length] = value == '' ? NaN : Number(value);
         }
 
         this.spots.push(spot);

@@ -284,12 +284,16 @@ Model.prototype = {
     _updateIntensities: function() {
         if (!this._activeMeasure || !this._spots) return;
 
+        function compareNumbers(a, b) {
+            return a - b;
+        }
+
         // Apply the scale function.
         var values = Array.prototype.slice.call(this._activeMeasure.values, 0, this._spots.length);
         values = values.map(this._scaleFunction);
 
         // Make a copy without NaNs and inifinities. Sort it.
-        var sorted = values.filter(function(x) { return x > -Infinity && x < Infinity; }).sort();
+        var sorted = values.filter(function(x) { return x > -Infinity && x < Infinity; }).sort(compareNumbers);
         var min = sorted.length > 0 ? sorted[0] : NaN;
         var max = sorted.length > 0 ? sorted[Math.ceil((values.length - 1) * this._hotspotQuantile)] : NaN;
 
