@@ -1,12 +1,10 @@
 function Model() {
     this._listeners = {
         'status-change': [],
-        'mesh-change': [],
+        'scene-change': [],
         'graphics-change': [],
-        'color-change': [],
         'intensities-change': [],
     };
-    this._geometry = null;
     this._mesh = null;
     this._spots = null;
     this._mapping = null;
@@ -19,6 +17,8 @@ function Model() {
     this._hotspotQuantile = 0.995;
     this._spotBorder = 0.05;
 
+    // 3D scene
+    this._scene = new THREE.Scene();
     this._3DMaterial = new THREE.MeshLambertMaterial({
         vertexColors: THREE.VertexColors,
         transparent: true,
@@ -26,6 +26,16 @@ function Model() {
         shininess: 3,
         shading: THREE.SmoothShading
     });
+    this._light1 = new THREE.PointLight(0xffffff, 1000, 100);
+    this._light1.position.set(-100, 100, 500);
+    this._light2 = new THREE.DirectionalLight(0xffffff, 1);
+    this._light2.position.set(0, 1, 0);
+    this._light3 = new THREE.DirectionalLight(0xffffff, 0.5);
+    this._light3.position.set(0, -1, 0);
+    this._scene.add(this._light1);
+    this._scene.add(this._light2);
+    this._scene.add(this._light3);
+    this._scene.add(new THREE.AxisHelper(20));
 
     this._status = '';
     this._tasks = {};
@@ -91,7 +101,7 @@ Model.prototype = {
     },
 
     loadImage: function(file) {
-        this._setGeometry(null);
+        this.mesh = null;
         this._cancelTask(Model.TaskType.LOAD_MESH);
         // this._spots = null;
         // this._measures = null;
@@ -101,7 +111,7 @@ Model.prototype = {
     },
 
     loadMesh: function(file) {
-        this._setGeometry(null);
+        this.mesh = null;
         this._setImage(null);
         this._cancelTask(Model.TaskType.LOAD_IMAGE);
         this._spots = null;
@@ -113,7 +123,7 @@ Model.prototype = {
                 geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
             }
             this._recolorGeometry(geometry, null, null);
-            this._setGeometry(geometry, this._3DMaterial);
+            this.mesh = new THREE.Mesh(geometry, this._3DMaterial);
             this.map();
         }.bind(this));
     },
@@ -166,9 +176,9 @@ Model.prototype = {
     },
 
     map: function() {
-        if (!this._geometry || !this._spots) return;
+        if (!this._mesh || !this._spots) return;
         var args = {
-            verteces: this._geometry.getAttribute('original-position').array,
+            verteces: this._mesh.geometry.getAttribute('original-position').array,
             spots: this._spots
         };
         this._doTask(Model.TaskType.MAP, args).then(function(results) {
@@ -259,12 +269,6 @@ Model.prototype = {
         });
     },
 
-    _setGeometry: function(geometry, material) {
-        this._geometry = geometry;
-        this._mesh = geometry ? new THREE.Mesh(geometry, material) : null;
-        this._notifyChange('mesh-change');
-    },
-
     _setImage: function(url, width, height) {
         if (this._image) {
             URL.revokeObjectURL(this._image.url);
@@ -305,10 +309,10 @@ Model.prototype = {
     },
 
     _recolor: function() {
-        if (this._geometry) {
-            this._recolorGeometry(this._geometry, this._mapping, this._spots);
+        if (this._mesh) {
+            this._recolorGeometry(this._mesh.geometry, this._mapping, this._spots);
         }
-        this._notifyChange('color-change');
+        this._notifyChange('scene-change');
     },
 
     recolorSVG: function(svg) {
@@ -389,10 +393,35 @@ Model.prototype = {
 
 Object.defineProperties(Model.prototype, {
     color: {
-        get: function() { return '#' + this._color.getHexString(); },
+        get: function() {
+            return '#' + this._color.getHexString();
+        },
+
         set: function(value) {
-            this._color.setStyle(value);
+            var color = new THREE.Color(value);
+            if (color.equals(this._color)) return;
+            this._color.set(color);
             this._recolor();
+        }
+    },
+
+    scene: {
+        get: function() {
+            return this._scene;
+        }
+    },
+
+    mesh: {
+        get: function() {
+            return this._mesh;
+        },
+
+        set: function(value) {
+            if (this._mesh === value) return;
+            if (this._mesh) this._scene.remove(this._mesh);
+            if (value) this._scene.add(value);
+            this._mesh = value;
+            this._notifyChange('scene-change');
         }
     }
 });
