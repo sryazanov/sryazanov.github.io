@@ -38,7 +38,7 @@ Model.Scale = {
 
 Model.TaskType = {
     LOAD_IMAGE: { key: 'load-image', worker: null },
-    LOAD_MESH: { key: 'load-mesh', worker: 'MesgLoader.js' },
+    LOAD_MESH: { key: 'load-mesh', worker: 'MeshLoader.js' },
     LOAD_MEASURES: { key: 'load-measures', worker: 'MeasuresLoader.js' },
     MAP: { key: 'map', worker: 'Mapper.js' },
 };
