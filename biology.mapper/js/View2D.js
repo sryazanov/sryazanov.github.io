@@ -12,7 +12,6 @@ function View2D(model, svg) {
     // Binding with model.
     this._model = model;
     this._model.addEventListener('graphics-change', this._onModelGraphicsChange.bind(this));
-    this._model.addEventListener('color-change', this._onModelColorChange.bind(this));
 
     this._svg.addEventListener('mousewheel', this._onMouseWheel.bind(this));
     this._svg.addEventListener('mousedown', this._onMouseDown.bind(this));

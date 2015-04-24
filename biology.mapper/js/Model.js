@@ -26,7 +26,7 @@ function Model() {
         shininess: 3,
         shading: THREE.SmoothShading
     });
-    this._light1 = new THREE.PointLight(0xffffff, 1000, 100);
+    this._light1 = new THREE.PointLight(0xffffff, 1, 0);
     this._light1.position.set(-100, 100, 500);
     this._light2 = new THREE.DirectionalLight(0xffffff, 1);
     this._light2.position.set(0, 1, 0);
@@ -423,7 +423,40 @@ Object.defineProperties(Model.prototype, {
             this._mesh = value;
             this._notifyChange('scene-change');
         }
-    }
+    },
+
+    lightIntensity1: {
+        get: function() {
+            return this._light1.intensity;
+        },
+
+        set: function(value) {
+            this._light1.intensity = value;
+            this._notifyChange('scene-change');
+        }
+    },
+
+    lightIntensity2: {
+        get: function() {
+            return this._light2.intensity;
+        },
+
+        set: function(value) {
+            this._light2.intensity = value;
+            this._notifyChange('scene-change');
+        }
+    },
+
+    lightIntensity3: {
+        get: function() {
+            return this._light3.intensity;
+        },
+
+        set: function(value) {
+            return this._light3.intensity = value;
+            this._notifyChange('scene-change');
+        }
+    },
 });
 
 Model.ColorMap = function(colorValues) {
