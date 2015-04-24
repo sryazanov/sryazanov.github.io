@@ -387,6 +387,16 @@ Model.prototype = {
     }
 };
 
+Object.defineProperties(Model.prototype, {
+    color: {
+        get: function() { return '#' + this._color.getHexString(); },
+        set: function(value) {
+            this._color.setStyle(value);
+            this._recolor();
+        }
+    }
+});
+
 Model.ColorMap = function(colorValues) {
     this._colors = new Array(colorValues.length);
     for (var i = 0; i < this._colors.length; i++) {

@@ -1,10 +1,13 @@
 var g_model;
 var g_views = {};
+var g_gui;
 
 function init() {
     g_model = new Model();
     g_views.v3D = new View3D(g_model, $('#view-container > canvas')[0]);
     g_views.v2D = new View2D(g_model, $('#view-container > svg')[0]);
+
+    initGUI();
 
     g_model.addEventListener('status-change', onModelStatusChange);
     g_model.addEventListener('intensities-change', onModelIntencitiesChange);
@@ -38,6 +41,12 @@ function onModelIntencitiesChange() {
         options.append($("<option />").val(this.index).text(this.name));
     });
     g_model.selectMeasure(options.val());
+}
+
+function initGUI() {
+    g_gui = new dat.GUI();
+    var f3d = g_gui.addFolder('3D');
+    f3d.addColor(g_model, 'color');
 }
 
 var DragAndDrop = {
