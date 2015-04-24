@@ -11,8 +11,7 @@ function init() {
 
     window.addEventListener('resize', onResize);
 
-    $('#load-mesh-button').click(onLoadMeshButtonClick);
-    $('#load-intensities-button').click(onLoadIntensitiesButtonClick);
+    $('#open-button').click(onOpenButtonClick);
     $('#intensity-selection').change(onIntensitiesSelectChange);
 
     for (var e in DragAndDrop) {
@@ -67,50 +66,45 @@ var DragAndDrop = {
         e.preventDefault();
         e.stopPropagation();
 
-        var handlers = DragAndDrop._findHandlers(e.dataTransfer.files);
-        for (var i = 0; i < handlers.length; i++) {
-            handlers[i]();
-        }
-    },
-
-    _findHandlers: function(files) {
-        var result = [];
-        for (var i = 0; i < files.length; i++) {
-            var file = files[i];
-
-            if ((/\.png$/i.test(file.name))) {
-                result.push(g_model.loadImage.bind(g_model, file));
-            } else if (/\.stl$/i.test(file.name)) {
-                result.push(g_model.loadMesh.bind(g_model, file));
-            } else if (/\.csv$/i.test(file.name)) {
-                result.push(g_model.loadIntensities.bind(g_model, file));
-            }
-        }
-        return result;
+        openFiles(e.dataTransfer.files);
     }
 };
 
-function openFile() {
-    return new Promise(function(resolve) {
-        var fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.addEventListener('change', function() {
-            resolve(fileInput.files[0]);
-        });
-        fileInput.click();
-    });
+function openFiles(files) {
+    var handlers = findFileHandlers(files);
+    for (var i = 0; i < handlers.length; i++) {
+        handlers[i]();
+    }
+};
+
+function findFileHandlers(files) {
+    var result = [];
+    for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+
+        if ((/\.png$/i.test(file.name))) {
+            result.push(g_model.loadImage.bind(g_model, file));
+        } else if (/\.stl$/i.test(file.name)) {
+            result.push(g_model.loadMesh.bind(g_model, file));
+        } else if (/\.csv$/i.test(file.name)) {
+            result.push(g_model.loadIntensities.bind(g_model, file));
+        }
+    }
+    return result;
 }
 
 function onModelStatusChange() {
     $('#status').text(g_model.getStatus());
 }
 
-function onLoadMeshButtonClick() {
-    openFile().then(g_model.loadMesh.bind(g_model));
-}
-
-function onLoadIntensitiesButtonClick() {
-    openFile().then(g_model.loadIntensities.bind(g_model));
+function onOpenButtonClick() {
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.addEventListener('change', function() {
+        openFiles(fileInput.files);
+    });
+    fileInput.click();
 }
 
 function onIntensitiesSelectChange() {
