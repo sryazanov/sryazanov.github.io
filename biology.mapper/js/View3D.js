@@ -10,7 +10,8 @@ function View3D(model, canvas) {
     
     // Binding with model.
     this._model = model;
-    this._model.addEventListener('scene-change', this._onSceneChange.bind(this));
+    this._model.addEventListener('mode-change', this._onModelModeChange.bind(this));
+    this._model.addEventListener('3d-scene-change', this._onSceneChange.bind(this));
     
     // Configure camera
     this._camera.position.x = -30;
@@ -37,8 +38,11 @@ View3D.prototype = {
         this.redraw();
     },
 
+    _onModelModeChange: function() {
+        this._canvas.hidden = this._model.mode != Model.Mode.MODE_3D;
+    },
+
     _onSceneChange: function() {
-        this._canvas.hidden = !this._model.mesh;
         this.redraw();
     },
 };

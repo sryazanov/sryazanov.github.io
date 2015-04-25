@@ -11,12 +11,14 @@ function View2D(model, svg) {
 
     // Binding with model.
     this._model = model;
-    this._model.addEventListener('graphics-change', this._onModelGraphicsChange.bind(this));
+    this._model.addEventListener('mode-change', this._onModelModeChange.bind(this));
+    this._model.addEventListener('2d-scene-change', this._onModelSceneChange.bind(this));
+    this._model.addEventListener('2d-scene-needs-recoloring', this._onModelSceneNeedsRecoloring.bind(this));
 
     this._svg.addEventListener('mousewheel', this._onMouseWheel.bind(this));
     this._svg.addEventListener('mousedown', this._onMouseDown.bind(this));
 
-    this._onModelGraphicsChange();
+    this._onModelModeChange();
 }
 
 View2D.SCALE_CHANGE = 1.2;
@@ -39,7 +41,7 @@ View2D.prototype = {
         this._offset.x = offset.x;
         this._offset.y = offset.y;
 
-        var imageSize = this._model.getImageSize();
+        var imageSize = this._model.imageSize;
         if (this._width > imageSize.width * this._scale) {
             this._offset.x = 0;
         } else {
@@ -56,7 +58,11 @@ View2D.prototype = {
         this._reposition();
     },
 
-    _onModelGraphicsChange: function() {
+    _onModelModeChange: function() {
+        this._svg.style.display = this._model.mode == Model.Mode.MODE_2D ? '' : 'none';
+    },
+
+    _onModelSceneChange: function() {
         if (this._graphics) {
             this._svg.removeChild(this._graphics);
         }
@@ -66,20 +72,19 @@ View2D.prototype = {
             this._reposition();
             this._svg.appendChild(graphics);
         }
-        this._svg.style.display = graphics ? '' : 'none';
     },
 
-    _reposition: function() {
-        var imageSize = this._model.getImageSize();
-        var x = (this._width - imageSize.width * this._scale) / 2 + this._offset.x;
-        var y = (this._height - imageSize.height * this._scale) / 2 + this._offset.y;
-        this._graphics.setAttribute('transform', 'translate(' + x + ', ' + y + ') scale(' + this._scale + ')');
-    },
-
-    _onModelColorChange: function() {
+    _onModelSceneNeedsRecoloring: function() {
         if (this._graphics) {
             this._model.recolorSVG(this._graphics);
         }
+    },
+
+    _reposition: function() {
+        var imageSize = this._model.imageSize;
+        var x = (this._width - imageSize.width * this._scale) / 2 + this._offset.x;
+        var y = (this._height - imageSize.height * this._scale) / 2 + this._offset.y;
+        this._graphics.setAttribute('transform', 'translate(' + x + ', ' + y + ') scale(' + this._scale + ')');
     },
 
     _onMouseWheel: function(event) {

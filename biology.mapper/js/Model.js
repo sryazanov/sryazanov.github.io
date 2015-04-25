@@ -1,10 +1,13 @@
 function Model() {
     this._listeners = {
         'status-change': [],
-        'scene-change': [],
-        'graphics-change': [],
+        'mode-change': [],
+        '3d-scene-change': [],
+        '2d-scene-change': [],
+        '2d-scene-needs-recoloring': [],
         'intensities-change': [],
     };
+    this._mode = Model.Mode.UNDEFINED;
     this._mesh = null;
     this._spots = null;
     this._mapping = null;
@@ -13,7 +16,7 @@ function Model() {
     this._activeMeasure = null;
     this._color = new THREE.Color('#001eb2');
     this._colorMap = new Model.JetColorMap();
-    this._scaleFunction = Model.Scale.LINEAR;
+    this._scale = Model.Scale.LOG;
     this._hotspotQuantile = 0.995;
     this._spotBorder = 0.05;
 
@@ -41,37 +44,57 @@ function Model() {
     this._tasks = {};
 }
 
+Model.Mode = {
+    UNDEFINED: 0,
+    MODE_2D: 1,
+    MODE_3D: 2,
+};
+
 Model.Scale = {
-    LOG: function(x) { return Math.log(1.0 + x); },
-    LINEAR: function(x) { return x; },
+    LOG: {
+        id: 'log',
+        function: Math.log,
+    },
+    LINEAR: {
+        id: 'linear',
+        function: function(x) {
+            return x;
+        }
+    }
+};
+
+Model.getScaleById = function(id) {
+    for (var i in Model.Scale) {
+        if (Model.Scale[i].id == id) return Model.Scale[i];
+    }
+    throw 'Invalid scale id: ' + id;
 };
 
 Model.TaskType = {
-    LOAD_IMAGE: { key: 'load-image', worker: null },
-    LOAD_MESH: { key: 'load-mesh', worker: 'MeshLoader.js' },
-    LOAD_MEASURES: { key: 'load-measures', worker: 'MeasuresLoader.js' },
-    MAP: { key: 'map', worker: 'Mapper.js' },
+    LOAD_IMAGE: {
+        key: 'load-image',
+        worker: null
+    },
+
+    LOAD_MESH: {
+        key: 'load-mesh',
+        worker: 'MeshLoader.js'
+    },
+
+    LOAD_MEASURES: {
+        key: 'load-measures',
+        worker: 'MeasuresLoader.js'
+    },
+
+    MAP: {
+        key: 'map',
+        worker: 'Mapper.js'
+    },
 };
 
 Model.prototype = {
     addEventListener: function(eventName, listener) {
         this._listeners[eventName].push(listener);
-    },
-
-    getStatus: function() {
-        return this._status;
-    },
-
-    getMesh: function() {
-        return this._mesh;
-    },
-
-    getMeasures: function() {
-        return this._measures || [];
-    },
-
-    getImageSize: function() {
-        return this._image && {width: this._image.width, height: this._image.height};
     },
 
     buildSVG: function(document) {
@@ -101,16 +124,16 @@ Model.prototype = {
     },
 
     loadImage: function(file) {
-        this.mesh = null;
-        this._cancelTask(Model.TaskType.LOAD_MESH);
-        // this._spots = null;
-        // this._measures = null;
+        this.mode = Model.Mode.MODE_2D;
+
         this._doTask(Model.TaskType.LOAD_IMAGE, file).then(function(result) {
             this._setImage(result.url, result.width, result.height);
         }.bind(this));
     },
 
     loadMesh: function(file) {
+        this.mode = Model.Mode.MODE_3D;
+
         this.mesh = null;
         this._setImage(null);
         this._cancelTask(Model.TaskType.LOAD_IMAGE);
@@ -133,10 +156,10 @@ Model.prototype = {
             this._spots = result.spots;
             this._measures = result.measures;
             this._activeMeasure = null;
-            if (this._mesh)
+            if (this._mode == Model.Mode.MODE_3D)
                 this.map();
-            else if (this._image)
-                this._notifyChange('graphics-change');
+            else if (this._mode == Model.Mode.MODE_2D)
+                this._notifyChange('2d-scene-change');
             this._notifyChange('intensities-change');
         }.bind(this));
     },
@@ -146,33 +169,6 @@ Model.prototype = {
 
         this._activeMeasure = this._measures[name];
         this._updateIntensities();
-    },
-
-    setHotspotQuantile: function(value) {
-        if (this._hotspotQuantile == value) return;
-        if (value < 0.0) value = 0.0;
-        if (value > 1.0) value = 1.0;
-        this._hotspotQuantile = value;
-        this._updateIntensities();
-    },
-
-    setScaleFunction: function(value) {
-        if (this._scaleFunction == value) return;
-        this._scaleFunction = value;
-        this._updateIntensities();
-    },
-
-    setColor: function(value) {
-        this._color = value;
-        this._recolor();
-    },
-
-    setSpotBorder: function(value) {
-        if (this._spotBorder == value) return;
-        if (value < 0.0) value = 0.0;
-        if (value > 1.0) value = 1.0;
-        this._spotBorder = value;
-        this._recolor();
     },
 
     map: function() {
@@ -282,7 +278,7 @@ Model.prototype = {
         } else {
             this._image = null;
         }
-        this._notifyChange('graphics-change');
+        this._notifyChange('2d-scene-change');
     },
 
     _updateIntensities: function() {
@@ -294,12 +290,12 @@ Model.prototype = {
 
         // Apply the scale function.
         var values = Array.prototype.slice.call(this._activeMeasure.values, 0, this._spots.length);
-        values = values.map(this._scaleFunction);
+        values = values.map(this._scale.function);
 
         // Make a copy without NaNs and inifinities. Sort it.
         var sorted = values.filter(function(x) { return x > -Infinity && x < Infinity; }).sort(compareNumbers);
         var min = sorted.length > 0 ? sorted[0] : NaN;
-        var max = sorted.length > 0 ? sorted[Math.ceil((values.length - 1) * this._hotspotQuantile)] : NaN;
+        var max = sorted.length > 0 ? sorted[Math.ceil((sorted.length - 1) * this._hotspotQuantile)] : NaN;
 
         for (var i = 0; i < values.length; i++) {
             var v = values[i];
@@ -309,10 +305,12 @@ Model.prototype = {
     },
 
     _recolor: function() {
-        if (this._mesh) {
+        if (this._mode == Model.Mode.MODE_3D) {
             this._recolorGeometry(this._mesh.geometry, this._mapping, this._spots);
+            this._notifyChange('3d-scene-change');
+        } else if (this._mode == Model.Mode.MODE_2D) {
+            this._notifyChange('2d-scene-needs-recoloring');
         }
-        this._notifyChange('scene-change');
     },
 
     recolorSVG: function(svg) {
@@ -392,6 +390,18 @@ Model.prototype = {
 };
 
 Object.defineProperties(Model.prototype, {
+    mode: {
+        get: function() {
+            return this._mode;
+        },
+
+        set: function(value) {
+            if (this._mode == value) return;
+            this._mode = value;
+            this._notifyChange('mode-change');
+        }
+    },
+
     color: {
         get: function() {
             return '#' + this._color.getHexString();
@@ -421,7 +431,65 @@ Object.defineProperties(Model.prototype, {
             if (this._mesh) this._scene.remove(this._mesh);
             if (value) this._scene.add(value);
             this._mesh = value;
-            this._notifyChange('scene-change');
+            this._notifyChange('3d-scene-change');
+        }
+    },
+
+    status: {
+        get: function() {
+            return this._status;
+        }
+    },
+
+    measures: {
+        get: function() {
+            return this._measures || [];
+        }
+    },
+
+    imageSize: {
+        get: function() {
+            return this._image && {width: this._image.width, height: this._image.height};
+        }
+    },
+
+    hotspotQuantile: {
+        get: function() {
+            return this._hotspotQuantile;
+        },
+
+        set: function(value) {
+            if (this._hotspotQuantile == value) return;
+            if (value < 0.0) value = 0.0;
+            if (value > 1.0) value = 1.0;
+            this._hotspotQuantile = value;
+            this._updateIntensities();
+        }
+    },
+
+    spotBorder: {
+        get: function() {
+            return this._spotBorder;
+        },
+
+        set: function(value) {
+            if (this._spotBorder == value) return;
+            if (value < 0.0) value = 0.0;
+            if (value > 1.0) value = 1.0;
+            this._spotBorder = value;
+            this._recolor();
+        }
+    },
+
+    scaleId: {
+        get: function() {
+            return this._scale.id;
+        },
+
+        set: function(value) {
+            if (this._scale.id == value) return;
+            this._scale = Model.getScaleById(value);
+            this._updateIntensities();
         }
     },
 
@@ -432,7 +500,7 @@ Object.defineProperties(Model.prototype, {
 
         set: function(value) {
             this._light1.intensity = value;
-            this._notifyChange('scene-change');
+            this._notifyChange('3d-scene-change');
         }
     },
 
@@ -443,7 +511,7 @@ Object.defineProperties(Model.prototype, {
 
         set: function(value) {
             this._light2.intensity = value;
-            this._notifyChange('scene-change');
+            this._notifyChange('3d-scene-change');
         }
     },
 
@@ -454,7 +522,7 @@ Object.defineProperties(Model.prototype, {
 
         set: function(value) {
             return this._light3.intensity = value;
-            this._notifyChange('scene-change');
+            this._notifyChange('3d-scene-change');
         }
     },
 });

@@ -37,7 +37,7 @@ function onResize() {
 function onModelIntencitiesChange() {
     var options = $('#intensity-selection');
     options.empty();
-    $.each(g_model.getMeasures(), function() {
+    $.each(g_model.measures, function() {
         options.append($("<option />").val(this.index).text(this.name));
     });
     g_model.selectMeasure(options.val());
@@ -50,6 +50,11 @@ function initGUI() {
     f3d.add(g_model, 'lightIntensity1', 0, 1).name('Light 1');
     f3d.add(g_model, 'lightIntensity2', 0, 1).name('Light 2');
     f3d.add(g_model, 'lightIntensity3', 0, 1).name('Light 3');
+
+    var fMapping = g_gui.addFolder('Mapping');
+    fMapping.add(g_model, 'scaleId', {'Linear': Model.Scale.LINEAR.id, 'Logarithmic': Model.Scale.LOG.id}).name('Scale');
+    fMapping.add(g_model, 'hotspotQuantile').name('Hotspot quantile').step(0.0001);
+    fMapping.add(g_model, 'spotBorder', 0, 1).name('Spot border').step(0.01);
 }
 
 var DragAndDrop = {
@@ -106,7 +111,7 @@ function findFileHandlers(files) {
 }
 
 function onModelStatusChange() {
-    $('#status').text(g_model.getStatus());
+    $('#status').text(g_model.status);
 }
 
 function onOpenButtonClick() {
