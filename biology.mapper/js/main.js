@@ -4,8 +4,9 @@ var g_gui;
 
 function init() {
     g_model = new Model();
-    g_views.v3D = new View3D(g_model, $('#view-container > canvas')[0]);
-    g_views.v2D = new View2D(g_model, $('#view-container > svg')[0]);
+    g_views.v3D = new View3D(g_model, $('#view-container canvas.view-3d')[0]);
+    g_views.v2D = new View2D(g_model, $('#view-container svg.view-2d')[0]);
+    g_views.vLegend = new ViewLegend(g_model, $('#view-container svg.view-legend')[0]);
 
     initGUI();
 
@@ -55,6 +56,15 @@ function initGUI() {
     fMapping.add(g_model, 'scaleId', {'Linear': Model.Scale.LINEAR.id, 'Logarithmic': Model.Scale.LOG.id}).name('Scale');
     fMapping.add(g_model, 'hotspotQuantile').name('Hotspot quantile').step(0.0001);
     fMapping.add(g_model, 'spotBorder', 0, 1).name('Spot border').step(0.01);
+
+    var fLegent = g_gui.addFolder('Legend');
+    fLegent.add(g_views.vLegend, 'location', {
+        'None': ViewLegend.Locations.NONE,
+        'Left-top': ViewLegend.Locations.LEFT_TOP,
+        'Right-top': ViewLegend.Locations.RIGHT_TOP,
+        'Left-bottom': ViewLegend.Locations.LEFT_BOTTOM,
+        'Right-bottom': ViewLegend.Locations.RIGHT_BOTTOM,
+    }).name('Location');
 }
 
 var DragAndDrop = {

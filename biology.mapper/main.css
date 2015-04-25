@@ -11,6 +11,7 @@ body {
 #view-container {
     overflow: hidden;
     flex-grow: 1;
+    position: relative;
 }
 
 .footage {
@@ -42,4 +43,34 @@ body {
     margin: 20px;
     border: 4px dashed #ddd;
     pointer-events: none;
+}
+
+.view-legend {
+    width: 200px;
+    height: 80px;
+    position: absolute;
+}
+
+[location="right-bottom"] {
+    right: 20px;
+    bottom: 20px;
+}
+
+[location="right-top"] {
+    right: 20px;
+    top: 20px;
+}
+
+[location="left-bottom"] {
+    left: 20px;
+    bottom: 20px;
+}
+
+[location="left-top"] {
+    left: 20px;
+    top: 20px;
+}
+
+[location="none"] {
+    display: none;
 }

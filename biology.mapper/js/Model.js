@@ -15,7 +15,7 @@ function Model() {
     this._image = null;
     this._activeMeasure = null;
     this._color = new THREE.Color('#001eb2');
-    this._colorMap = new Model.JetColorMap();
+    this._colorMap = new JetColorMap();
     this._scale = Model.Scale.LOG;
     this._hotspotQuantile = 0.995;
     this._spotBorder = 0.05;
@@ -126,6 +126,7 @@ Model.prototype = {
     loadImage: function(file) {
         this.mode = Model.Mode.MODE_2D;
 
+        this._setImage(null);
         this._doTask(Model.TaskType.LOAD_IMAGE, file).then(function(result) {
             this._setImage(result.url, result.width, result.height);
         }.bind(this));
@@ -135,10 +136,6 @@ Model.prototype = {
         this.mode = Model.Mode.MODE_3D;
 
         this.mesh = null;
-        this._setImage(null);
-        this._cancelTask(Model.TaskType.LOAD_IMAGE);
-        this._spots = null;
-        this._measures = null;
         this._doTask(Model.TaskType.LOAD_MESH, file).then(function(result) {
             var geometry = new THREE.BufferGeometry();
             for (var name in event.data.attributes) {
@@ -305,7 +302,7 @@ Model.prototype = {
     },
 
     _recolor: function() {
-        if (this._mode == Model.Mode.MODE_3D) {
+        if (this._mode == Model.Mode.MODE_3D && this._mesh) {
             this._recolorGeometry(this._mesh.geometry, this._mapping, this._spots);
             this._notifyChange('3d-scene-change');
         } else if (this._mode == Model.Mode.MODE_2D) {
@@ -398,6 +395,16 @@ Object.defineProperties(Model.prototype, {
         set: function(value) {
             if (this._mode == value) return;
             this._mode = value;
+
+            if (this._mode != Model.Mode.MODE_2D) {
+                this._setImage(null);
+                this._cancelTask(Model.TaskType.LOAD_IMAGE);
+            }
+            if (this._mode != Model.Mode.MODE_3D) {
+                this.mesh = null;
+                this._cancelTask(Model.TaskType.LOAD_MESH);
+            }
+
             this._notifyChange('mode-change');
         }
     },
@@ -525,42 +532,13 @@ Object.defineProperties(Model.prototype, {
             this._notifyChange('3d-scene-change');
         }
     },
+
+    colorMapGradient: {
+        get: function() {
+            return this._colorMap.gradient;
+        }
+    }
 });
-
-Model.ColorMap = function(colorValues) {
-    this._colors = new Array(colorValues.length);
-    for (var i = 0; i < this._colors.length; i++) {
-        this._colors[i] = new THREE.Color(colorValues[i]);
-    }
-};
-
-Model.ColorMap.prototype = {
-    map: function(color, intensity) {
-        if (intensity <= 0.0) {
-            color.set(this._colors[0]);
-            return;
-        }
-        if (intensity >= 1.0) {
-            color.set(this._colors[this._colors.length - 1]);
-            return;
-        }
-
-        var position = intensity * (this._colors.length - 1);
-        var index = Math.floor(position);
-        var alpha = position - index;
-
-        color.set(this._colors[index]);
-        color.lerp(this._colors[index + 1], alpha);
-    }
-};
-
-Model.JetColorMap = function() {
-    Model.ColorMap.call(this, ['#00007F', 'blue', '#007FFF','cyan', '#7FFF7F', 'yellow', '#FF7F00', 'red', '#7F0000']);
-};
-
-Model.JetColorMap.prototype = {
-    __proto__: Model.ColorMap.prototype
-};
 
 Model.ImageLoader = function() {
     this.onmessage = null;
