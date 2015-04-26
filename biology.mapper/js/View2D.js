@@ -11,24 +11,19 @@ function View2D(model, svg) {
 
     // Binding with model.
     this._model = model;
-    this._model.addEventListener('mode-change', this._onModelModeChange.bind(this));
     this._model.addEventListener('2d-scene-change', this._onModelSceneChange.bind(this));
     this._model.addEventListener('2d-scene-needs-recoloring', this._onModelSceneNeedsRecoloring.bind(this));
 
     this._svg.addEventListener('mousewheel', this._onMouseWheel.bind(this));
     this._svg.addEventListener('mousedown', this._onMouseDown.bind(this));
-
-    this._onModelModeChange();
 }
 
 View2D.SCALE_CHANGE = 1.2;
 
 View2D.prototype = {
-    resize: function(width, height) {
-        this._svg.style.width = width + 'px';
-        this._svg.style.height = height + 'px';
-        this._width = width;
-        this._height = height;
+    updateLayout: function() {
+        this._width = this._svg.clientWidth;
+        this._height = this._svg.clientHeight;
         if (this._graphics)
             this.setOffset(this._offset);
     },
@@ -56,10 +51,6 @@ View2D.prototype = {
         }
 
         this._reposition();
-    },
-
-    _onModelModeChange: function() {
-        this._svg.style.display = this._model.mode == Model.Mode.MODE_2D ? '' : 'none';
     },
 
     _onModelSceneChange: function() {

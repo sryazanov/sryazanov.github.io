@@ -15,10 +15,8 @@ ViewLegend.Locations = {
 };
 
 ViewLegend.prototype = Object.create(null, {
-    resize: {
-        value: function(width, height) {
-
-        }
+    updateLayout: {
+        value: function() {}
     },
 
     location: {

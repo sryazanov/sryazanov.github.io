@@ -12,6 +12,48 @@ body {
     overflow: hidden;
     flex-grow: 1;
     position: relative;
+    display:  flex;
+}
+
+#view-container > .view-welcome,
+#view-container > .view-2d,
+#view-container > .view-3d {
+    display: none;
+    width: 100%;
+    height:  100%;
+}
+
+#view-container[mode=''] > .view-welcome {
+    display: block;
+    display: flex;
+}
+
+body[drop-target] > #view-container[mode=''] > .view-welcome.view-welcome {
+    display: none;
+}
+
+#view-container[mode='2d'] > .view-2d {
+    display: block;
+}
+
+#view-container[mode='3d'] > .view-3d {
+    display: block;
+}
+
+#status {
+    color: black;
+    left: 0;
+    bottom: 0;
+    position: absolute;
+    background-color: silver;
+    opacity: 0.6;
+    padding: 0px 15px 0px 5px;
+    display: block;
+    transition: 0.5s 0.1s;
+}
+
+#status[hidden] {
+    opacity: 0;
 }
 
 .footage {
@@ -29,11 +71,20 @@ body {
     z-index: 1000;
 }
 
-#drop-target-informer[hidden] {
+#drop-target-informer {
     display: none
 }
 
-#drop-target-informer .message {
+body[drop-target] > #drop-target-informer {
+    display: flex;
+}
+
+#drop-target-informer > .message {
+    border: 4px dashed #ddd;
+    pointer-events: none;
+}
+
+.message {
     flex: auto;
     font-size: 30px;
     color: #999;
@@ -41,8 +92,6 @@ body {
     justify-content: center;
     align-items: center;
     margin: 20px;
-    border: 4px dashed #ddd;
-    pointer-events: none;
 }
 
 .view-legend {

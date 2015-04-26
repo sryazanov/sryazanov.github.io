@@ -10,10 +10,11 @@ function init() {
 
     initGUI();
 
+    g_model.addEventListener('mode-change', onModelModeChange);
     g_model.addEventListener('status-change', onModelStatusChange);
     g_model.addEventListener('intensities-change', onModelIntencitiesChange);
 
-    window.addEventListener('resize', onResize);
+    window.addEventListener('resize', updateLayout);
 
     $('#open-button').click(onOpenButtonClick);
     $('#intensity-selection').change(onIntensitiesSelectChange);
@@ -22,17 +23,18 @@ function init() {
         document.addEventListener(e, DragAndDrop[e], true);
     }
 
-    onResize();
+    onModelModeChange();
 }
 
-function onResize() {
-    var container = $('#view-container')[0];
-    var width = container.offsetWidth;
-    var height = container.offsetHeight;
-
+function updateLayout() {
     for (name in g_views) {
-        g_views[name].resize(width, height);
+        g_views[name].updateLayout();
     }
+}
+
+function onModelModeChange() {
+    $('#view-container').attr('mode', g_model.mode);
+    updateLayout();
 }
 
 function onModelIntencitiesChange() {
@@ -42,6 +44,15 @@ function onModelIntencitiesChange() {
         options.append($("<option />").val(this.index).text(this.name));
     });
     g_model.selectMeasure(options.val());
+}
+
+function onModelStatusChange() {
+    if (g_model.status) {
+        $('#status').text(g_model.status);
+        $('#status').prop('hidden', false);
+    } else {
+        $('#status').prop('hidden', true);
+    }
 }
 
 function initGUI() {
@@ -73,13 +84,13 @@ var DragAndDrop = {
     dragenter: function(e) {
         e.preventDefault();
         if (++DragAndDrop._counter == 1)
-            $('#drop-target-informer').prop('hidden', false);
+            $('body').attr('drop-target', '');
     },
 
     dragleave: function(e) {
         e.preventDefault();
         if (--DragAndDrop._counter === 0)
-            $('#drop-target-informer').prop('hidden', true);
+            $('body').removeAttr('drop-target');
     },
 
     dragover: function(e) {
@@ -88,7 +99,7 @@ var DragAndDrop = {
 
     drop: function(e) {
         DragAndDrop._counter = 0;
-        $('#drop-target-informer').prop('hidden', true);
+        $('body').removeAttr('drop-target');
 
         e.preventDefault();
         e.stopPropagation();
@@ -118,10 +129,6 @@ function findFileHandlers(files) {
         }
     }
     return result;
-}
-
-function onModelStatusChange() {
-    $('#status').text(g_model.status);
 }
 
 function onOpenButtonClick() {
