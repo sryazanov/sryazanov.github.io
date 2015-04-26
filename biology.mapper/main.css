@@ -56,8 +56,48 @@ body[drop-target] > #view-container[mode=''] > .view-welcome.view-welcome {
     opacity: 0;
 }
 
-.footage {
-    height: 20px;
+#open-button {
+    color: blue;
+    cursor: pointer;
+}
+
+#map-selector {
+    position: absolute;
+    right: 20px;
+    top: 30%;
+    width: 200px;
+    bottom: 120px;
+    background-color: silver;
+    overflow:  hidden;
+    z-index: 100;
+    display:  flex;
+    flex-direction: column;
+    border: 1px solid #002000;
+    font: 12px 'Lucida Grande', sans-serif;
+}
+
+#map-selector[hidden] {
+    display: none;
+}
+
+#map-selector > input {
+    left: 2px;
+    right: 2px;
+}
+
+#map-selector > .items {
+    overflow-y: auto;
+    flex: 1;
+    padding: 3px;
+}
+
+#map-selector > .items > * {
+    cursor: pointer;
+}
+
+#map-selector > .items > *[selected] {
+    color: white;
+    background-color: blue;
 }
 
 #drop-target-informer {
@@ -68,7 +108,6 @@ body[drop-target] > #view-container[mode=''] > .view-welcome.view-welcome {
     right: 0;
     display: flex;
     background-color: rgba(255,255,255,0.8);
-    z-index: 1000;
 }
 
 #drop-target-informer {

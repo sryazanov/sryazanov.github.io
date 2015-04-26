@@ -31,9 +31,9 @@ function Model() {
     });
     this._light1 = new THREE.PointLight(0xffffff, 1, 0);
     this._light1.position.set(-100, 100, 500);
-    this._light2 = new THREE.DirectionalLight(0xffffff, 1);
+    this._light2 = new THREE.DirectionalLight(0xffffff, 0.8);
     this._light2.position.set(0, 1, 0);
-    this._light3 = new THREE.DirectionalLight(0xffffff, 0.5);
+    this._light3 = new THREE.DirectionalLight(0xffffff, 1);
     this._light3.position.set(0, -1, 0);
     this._scene.add(this._light1);
     this._scene.add(this._light2);
@@ -173,10 +173,10 @@ Model.prototype = Object.create(null, {
     },
 
     selectMeasure: {
-        value: function(name) {
+        value: function(index) {
             if (!this._measures) return;
 
-            this._activeMeasure = this._measures[name];
+            this._activeMeasure = this._measures[index];
             this._updateIntensities();
         }
     },

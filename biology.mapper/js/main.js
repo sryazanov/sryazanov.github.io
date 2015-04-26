@@ -1,23 +1,26 @@
 var g_model;
 var g_views = {};
 var g_gui;
+var g_mapSelector;
 
 function init() {
     g_model = new Model();
     g_views.v3D = new View3D(g_model, $('#view-container canvas.view-3d')[0]);
     g_views.v2D = new View2D(g_model, $('#view-container svg.view-2d')[0]);
     g_views.vLegend = new ViewLegend(g_model, $('#view-container svg.view-legend')[0]);
+    g_mapSelector = new MapSelector(g_model, $('#map-selector')[0], $('#current-map-name')[0]);
 
     initGUI();
 
     g_model.addEventListener('mode-change', onModelModeChange);
     g_model.addEventListener('status-change', onModelStatusChange);
-    g_model.addEventListener('intensities-change', onModelIntencitiesChange);
 
     window.addEventListener('resize', updateLayout);
+    document.addEventListener('keydown', onKeyDown, false);
 
     $('#open-button').click(onOpenButtonClick);
     $('#intensity-selection').change(onIntensitiesSelectChange);
+    $('#current-map-label').click(g_mapSelector.activate.bind(g_mapSelector));
 
     for (var e in DragAndDrop) {
         document.addEventListener(e, DragAndDrop[e], true);
@@ -32,18 +35,23 @@ function updateLayout() {
     }
 }
 
+var KEYBOARD_SHORTCUTS = {
+    "U+004F": onOpenButtonClick, // Ctrl + O
+    "U+0046": function() { g_mapSelector.activate(); } // Ctrl + F
+};
+
+function onKeyDown(event) {
+    if (event.ctrlKey && !event.altKey && event.keyIdentifier in KEYBOARD_SHORTCUTS) {
+        var handler = KEYBOARD_SHORTCUTS[event.keyIdentifier];
+        handler();
+        event.stopPropagation();
+        event.preventDefault();
+    }
+}
+
 function onModelModeChange() {
     $('#view-container').attr('mode', g_model.mode);
     updateLayout();
-}
-
-function onModelIntencitiesChange() {
-    var options = $('#intensity-selection');
-    options.empty();
-    $.each(g_model.measures, function() {
-        options.append($("<option />").val(this.index).text(this.name));
-    });
-    g_model.selectMeasure(options.val());
 }
 
 function onModelStatusChange() {

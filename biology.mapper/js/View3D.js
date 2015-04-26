@@ -20,6 +20,7 @@ function View3D(model, canvas) {
 
     this._controls = new THREE.OrbitControls(this._camera, canvas);
     this._controls.target = this._model.scene.position;
+    this._controls.noKeys = true;
     this._controls.update();
     this._controls.addEventListener('change', this.redraw.bind(this));
 }

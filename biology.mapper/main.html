@@ -7,6 +7,7 @@
   <script src="js/lib/three.min.js"></script>
   <script src="js/lib/OrbitControls.js"></script>
   <script src="js/ColorMaps.js"></script>
+  <script src="js/MapSelector.js"></script>
   <script src="js/Model.js"></script>
   <script src="js/View2D.js"></script>
   <script src="js/View3D.js"></script>
@@ -16,7 +17,7 @@
 <body>
 <div id="view-container" mode="">
 <div class="view-welcome">
-<div class="message"><a href="#" id="open-button">Open</a> files or drag and drop them.</div>
+<div class="message"><span id="open-button">Open</span>&nbsp;files or drag and drop them.</div>
 </div>
 <svg class="view-2d" xmlns="http://www.w3.org/2000/svg" xmlns:xlink= "http://www.w3.org/1999/xlink"></svg>
 <canvas class="view-3d"></canvas>
@@ -28,13 +29,12 @@
     </linearGradient>
   </defs>
   <rect x="0" y="0" width="100%" height="100%" fill="gray" fill-opacity="0.5"/>
-  <rect x="10" y="10" width="180" height="20" style="fill:url(#colorMapGradient)"/>
+  <text id="current-map-label" x="100" y="20" fill="black" text-anchor="middle" cursor="pointer">map: <tspan id="current-map-name"/></text>
+  <rect x="10" y="30" width="180" height="20" style="fill:url(#colorMapGradient)"/>
 </svg>
 <div id="status" hidden></div>
 </div>
-<div class="footage">
-<select id="intensity-selection"></select>
-</div>
+<div id="map-selector" hidden><input type="text"><div class="items"></div></div>
 <div id="drop-target-informer"><div class="message">Drop files here</div></div>
 </body>
 </html>
