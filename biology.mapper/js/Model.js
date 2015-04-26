@@ -55,6 +55,7 @@ Model.Scale = {
         id: 'log',
         function: Math.log,
     },
+
     LINEAR: {
         id: 'linear',
         function: function(x) {
@@ -92,301 +93,333 @@ Model.TaskType = {
     },
 };
 
-Model.prototype = {
-    addEventListener: function(eventName, listener) {
-        this._listeners[eventName].push(listener);
-    },
-
-    buildSVG: function(document) {
-        if (!this._image) return null;
-        var SVGNS = 'http://www.w3.org/2000/svg';
-        var groupElement = document.createElementNS(SVGNS, 'g');
-        var imageElement = document.createElementNS(SVGNS, 'image');
-        imageElement.href.baseVal = this._image.url;
-        imageElement.width.baseVal.value = this._image.width;
-        imageElement.height.baseVal.value = this._image.height;
-        groupElement.appendChild(imageElement);
-
-        var defsElement = document.createElementNS(SVGNS, 'defs');
-        groupElement.appendChild(defsElement);
-
-        var spotsGroupElement = document.createElementNS(SVGNS, 'g');
-        var labelsGroupElement = document.createElementNS(SVGNS, 'g');
-        groupElement.appendChild(spotsGroupElement);
-        groupElement.appendChild(labelsGroupElement);
-
-        if (this._spots) {
-            this._createSVGSpots(spotsGroupElement, labelsGroupElement, defsElement);
-            this.recolorSVG(groupElement);
+Model.prototype = Object.create(null, {
+    addEventListener: {
+        value: function(eventName, listener) {
+            this._listeners[eventName].push(listener);
         }
-
-        return groupElement;
     },
 
-    loadImage: function(file) {
-        this.mode = Model.Mode.MODE_2D;
+    buildSVG: {
+        value: function(document) {
+            if (!this._image) return null;
+            var SVGNS = 'http://www.w3.org/2000/svg';
+            var groupElement = document.createElementNS(SVGNS, 'g');
+            var imageElement = document.createElementNS(SVGNS, 'image');
+            imageElement.href.baseVal = this._image.url;
+            imageElement.width.baseVal.value = this._image.width;
+            imageElement.height.baseVal.value = this._image.height;
+            groupElement.appendChild(imageElement);
 
-        this._setImage(null);
-        this._doTask(Model.TaskType.LOAD_IMAGE, file).then(function(result) {
-            this._setImage(result.url, result.width, result.height);
-        }.bind(this));
-    },
+            var defsElement = document.createElementNS(SVGNS, 'defs');
+            groupElement.appendChild(defsElement);
 
-    loadMesh: function(file) {
-        this.mode = Model.Mode.MODE_3D;
+            var spotsGroupElement = document.createElementNS(SVGNS, 'g');
+            var labelsGroupElement = document.createElementNS(SVGNS, 'g');
+            groupElement.appendChild(spotsGroupElement);
+            groupElement.appendChild(labelsGroupElement);
 
-        this.mesh = null;
-        this._doTask(Model.TaskType.LOAD_MESH, file).then(function(result) {
-            var geometry = new THREE.BufferGeometry();
-            for (var name in event.data.attributes) {
-                var attribute = event.data.attributes[name];
-                geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
+            if (this._spots) {
+                this._createSVGSpots(spotsGroupElement, labelsGroupElement, defsElement);
+                this.recolorSVG(groupElement);
             }
-            this._recolorGeometry(geometry, null, null);
-            this.mesh = new THREE.Mesh(geometry, this._3DMaterial);
-            this.map();
-        }.bind(this));
-    },
 
-    loadIntensities: function(file) {
-        this._doTask(Model.TaskType.LOAD_MEASURES, file).then(function(result) {
-            this._spots = result.spots;
-            this._measures = result.measures;
-            this._activeMeasure = null;
-            if (this._mode == Model.Mode.MODE_3D)
-                this.map();
-            else if (this._mode == Model.Mode.MODE_2D)
-                this._notifyChange('2d-scene-change');
-            this._notifyChange('intensities-change');
-        }.bind(this));
-    },
-
-    selectMeasure: function(name) {
-        if (!this._measures) return;
-
-        this._activeMeasure = this._measures[name];
-        this._updateIntensities();
-    },
-
-    map: function() {
-        if (!this._mesh || !this._spots) return;
-        var args = {
-            verteces: this._mesh.geometry.getAttribute('original-position').array,
-            spots: this._spots
-        };
-        this._doTask(Model.TaskType.MAP, args).then(function(results) {
-            this._mapping = {
-                    closestSpotIndeces: event.data.closestSpotIndeces,
-                    closestSpotDistances: event.data.closestSpotDistances
-            };
-            this._recolor();
-            this._mapper = null;
-        }.bind(this));
-    },
-
-    _createSVGSpots: function(spotsGrpupElement, lablesGroupElement, defsElement) {
-        var SVGNS = 'http://www.w3.org/2000/svg';
-
-        var document = spotsGrpupElement.ownerDocument;
-
-        for (var i = 0; i < this._spots.length; i++) {
-            var spot = this._spots[i];
-
-            var gradientElement = document.createElementNS(SVGNS, 'radialGradient');
-            gradientElement.cx.baseVal = "50%";
-            gradientElement.cy.baseVal = "50%";
-            gradientElement.r.baseVal = "50%";
-            gradientElement.fx.baseVal = "50%";
-            gradientElement.fy.baseVal = "50%";
-            gradientElement.id = "spot" + i;
-
-            gradientElement.innerHTML = '<stop offset="0%" />' +
-                                        '<stop offset="100%" />';
-            defsElement.appendChild(gradientElement);
-
-            var spotElement = document.createElementNS(SVGNS, 'ellipse');
-            spotElement.rx.baseVal.value = spot.r;
-            spotElement.ry.baseVal.value = spot.r;
-            spotElement.cx.baseVal.value = spot.x;
-            spotElement.cy.baseVal.value = spot.y;
-            spotElement.style.fill = 'url(#spot' + i + ')';
-            spotsGrpupElement.appendChild(spotElement);
-
-            var labelElement = document.createElementNS(SVGNS, 'text');
-            labelElement.textContent = spot.name;
-            labelElement.setAttribute('x', spot.x + 5);
-            labelElement.setAttribute('y', spot.y);
-            lablesGroupElement.appendChild(labelElement);
+            return groupElement;
         }
     },
 
-    _cancelTask: function(taskType) {
-        if (taskType.key in this._tasks) {
-            this._tasks[taskType.key].worker.terminate();
-            delete this._tasks[taskType.key];
+    loadImage: {
+        value: function(file) {
+            this.mode = Model.Mode.MODE_2D;
+
+            this._setImage(null);
+            this._doTask(Model.TaskType.LOAD_IMAGE, file).then(function(result) {
+                this._setImage(result.url, result.width, result.height);
+            }.bind(this));
         }
     },
 
-    _doTask: function(taskType, args) {
-        if (taskType.key in this._tasks) this._cancelTask(taskType);
+    loadMesh: {
+        value: function(file) {
+            this.mode = Model.Mode.MODE_3D;
 
-        var task = {
-            worker: typeof taskType.worker == 'function' ?
-                    new taskType.worker() : new Worker('js/workers/' + taskType.worker),
-            status: '',
-            cancel: this._cancelTask.bind(this, taskType),
-            startTime: new Date().valueOf(),
-        };
-        this._tasks[taskType.key] = task;
-        var setStatus = this._setStatus.bind(this);
-
-        task.worker.postMessage(args);
-        return new Promise(function(resolve, reject) {
-            task.worker.onmessage = function(event) {
-                if (event.data.status == 'completed') {
-                    setStatus('');
-                    resolve(event.data);
-                    task.cancel();
-                    console.info('Task ' + taskType.key + ' completed in ' + (new Date().valueOf() - task.startTime) / 1000 + ' sec');
-                } else if (event.data.status == 'failed') {
-                    reject(event.data);
-                    task.cancel();
-                    alert('Operation failed: ' + event.message);
-                } else if (event.data.status == 'working') {
-                    setStatus(event.data.message);
+            this.mesh = null;
+            this._doTask(Model.TaskType.LOAD_MESH, file).then(function(result) {
+                var geometry = new THREE.BufferGeometry();
+                for (var name in event.data.attributes) {
+                    var attribute = event.data.attributes[name];
+                    geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
                 }
+                this._recolorGeometry(geometry, null, null);
+                this.mesh = new THREE.Mesh(geometry, this._3DMaterial);
+                this.map();
+            }.bind(this));
+        }
+    },
+
+    loadIntensities: {
+        value: function(file) {
+            this._doTask(Model.TaskType.LOAD_MEASURES, file).then(function(result) {
+                this._spots = result.spots;
+                this._measures = result.measures;
+                this._activeMeasure = null;
+                if (this._mode == Model.Mode.MODE_3D)
+                    this.map();
+                else if (this._mode == Model.Mode.MODE_2D)
+                    this._notifyChange('2d-scene-change');
+                this._notifyChange('intensities-change');
+            }.bind(this));
+        }
+    },
+
+    selectMeasure: {
+        value: function(name) {
+            if (!this._measures) return;
+
+            this._activeMeasure = this._measures[name];
+            this._updateIntensities();
+        }
+    },
+
+    map: {
+        value: function() {
+            if (!this._mesh || !this._spots) return;
+            var args = {
+                verteces: this._mesh.geometry.getAttribute('original-position').array,
+                spots: this._spots
             };
-            task.worker.onerror = function(event) {
-                alert('Operation failed. See log for details.');
+            this._doTask(Model.TaskType.MAP, args).then(function(results) {
+                this._mapping = {
+                        closestSpotIndeces: event.data.closestSpotIndeces,
+                        closestSpotDistances: event.data.closestSpotDistances
+                };
+                this._recolor();
+                this._mapper = null;
+            }.bind(this));
+        }
+    },
+
+    _createSVGSpots: {
+        value: function(spotsGrpupElement, lablesGroupElement, defsElement) {
+            var SVGNS = 'http://www.w3.org/2000/svg';
+
+            var document = spotsGrpupElement.ownerDocument;
+
+            for (var i = 0; i < this._spots.length; i++) {
+                var spot = this._spots[i];
+
+                var gradientElement = document.createElementNS(SVGNS, 'radialGradient');
+                gradientElement.cx.baseVal = "50%";
+                gradientElement.cy.baseVal = "50%";
+                gradientElement.r.baseVal = "50%";
+                gradientElement.fx.baseVal = "50%";
+                gradientElement.fy.baseVal = "50%";
+                gradientElement.id = "spot" + i;
+
+                gradientElement.innerHTML = '<stop offset="0%" />' +
+                                            '<stop offset="100%" />';
+                defsElement.appendChild(gradientElement);
+
+                var spotElement = document.createElementNS(SVGNS, 'ellipse');
+                spotElement.rx.baseVal.value = spot.r;
+                spotElement.ry.baseVal.value = spot.r;
+                spotElement.cx.baseVal.value = spot.x;
+                spotElement.cy.baseVal.value = spot.y;
+                spotElement.style.fill = 'url(#spot' + i + ')';
+                spotsGrpupElement.appendChild(spotElement);
+
+                var labelElement = document.createElementNS(SVGNS, 'text');
+                labelElement.textContent = spot.name;
+                labelElement.setAttribute('x', spot.x + 5);
+                labelElement.setAttribute('y', spot.y);
+                lablesGroupElement.appendChild(labelElement);
+            }
+        }
+    },
+
+    _cancelTask: {
+        value: function(taskType) {
+            if (taskType.key in this._tasks) {
+                this._tasks[taskType.key].worker.terminate();
+                delete this._tasks[taskType.key];
+            }
+        }
+    },
+
+    _doTask: {
+        value: function(taskType, args) {
+            if (taskType.key in this._tasks) this._cancelTask(taskType);
+
+            var task = {
+                worker: typeof taskType.worker == 'function' ?
+                        new taskType.worker() : new Worker('js/workers/' + taskType.worker),
+                status: '',
+                cancel: this._cancelTask.bind(this, taskType),
+                startTime: new Date().valueOf(),
             };
-        });
-    },
+            this._tasks[taskType.key] = task;
+            var setStatus = this._setStatus.bind(this);
 
-    _setImage: function(url, width, height) {
-        if (this._image) {
-            URL.revokeObjectURL(this._image.url);
-        }
-        if (url) {
-            this._image = {
-                url: url,
-                width: width,
-                height: height,
-            };
-        } else {
-            this._image = null;
-        }
-        this._notifyChange('2d-scene-change');
-    },
-
-    _updateIntensities: function() {
-        if (!this._activeMeasure || !this._spots) return;
-
-        function compareNumbers(a, b) {
-            return a - b;
-        }
-
-        // Apply the scale function.
-        var values = Array.prototype.slice.call(this._activeMeasure.values, 0, this._spots.length);
-        values = values.map(this._scale.function);
-
-        // Make a copy without NaNs and inifinities. Sort it.
-        var sorted = values.filter(function(x) { return x > -Infinity && x < Infinity; }).sort(compareNumbers);
-        var min = sorted.length > 0 ? sorted[0] : NaN;
-        var max = sorted.length > 0 ? sorted[Math.ceil((sorted.length - 1) * this._hotspotQuantile)] : NaN;
-
-        for (var i = 0; i < values.length; i++) {
-            var v = values[i];
-            this._spots[i].intensity = isNaN(v) || v == -Infinity ? NaN : Math.min(1.0, (v - min) / (max - min));
-        }
-        this._recolor();
-    },
-
-    _recolor: function() {
-        if (this._mode == Model.Mode.MODE_3D && this._mesh) {
-            this._recolorGeometry(this._mesh.geometry, this._mapping, this._spots);
-            this._notifyChange('3d-scene-change');
-        } else if (this._mode == Model.Mode.MODE_2D) {
-            this._notifyChange('2d-scene-needs-recoloring');
+            task.worker.postMessage(args);
+            return new Promise(function(resolve, reject) {
+                task.worker.onmessage = function(event) {
+                    if (event.data.status == 'completed') {
+                        setStatus('');
+                        resolve(event.data);
+                        task.cancel();
+                        console.info('Task ' + taskType.key + ' completed in ' + (new Date().valueOf() - task.startTime) / 1000 + ' sec');
+                    } else if (event.data.status == 'failed') {
+                        reject(event.data);
+                        task.cancel();
+                        alert('Operation failed: ' + event.message);
+                    } else if (event.data.status == 'working') {
+                        setStatus(event.data.message);
+                    }
+                };
+                task.worker.onerror = function(event) {
+                    alert('Operation failed. See log for details.');
+                };
+            });
         }
     },
 
-    recolorSVG: function(svg) {
-        var startTime = new Date();
-
-        var gradients = svg.getElementsByTagName('radialGradient');
-        var intensityColor = new THREE.Color();
-        for (var i = 0; i < gradients.length; i++) {
-            var g = gradients[i];
-            var stop0 = gradients[i].children[0];
-            var stop1 = gradients[i].children[1];
-
-            var spot = this._spots[i];
-            if (spot && !isNaN(spot.intensity)) {
-                this._colorMap.map(intensityColor, spot.intensity);
-                stop0.style.stopColor = stop1.style.stopColor = intensityColor.getStyle();
-                stop0.style.stopOpacity = 1.0;
-                stop1.style.stopOpacity = this._spotBorder;
+    _setImage: {
+        value: function(url, width, height) {
+            if (this._image) {
+                URL.revokeObjectURL(this._image.url);
+            }
+            if (url) {
+                this._image = {
+                    url: url,
+                    width: width,
+                    height: height,
+                };
             } else {
-                stop0.style.stopColor = stop1.style.stopColor = '';
-                stop0.style.stopOpacity = stop1.style.stopOpacity = 0;
+                this._image = null;
             }
+            this._notifyChange('2d-scene-change');
         }
-
-        var endTime = new Date();
-        console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
     },
 
-    _recolorGeometry: function(geometry, mapping, spots) {
-        if (!geometry) return;
+    _updateIntensities: {
+        value: function() {
+            if (!this._activeMeasure || !this._spots) return;
 
-        var startTime = new Date();
-
-        var position = geometry.getAttribute('position');
-        var positionCount = position.array.length / position.itemSize;
-
-        var intensityColor = new THREE.Color();
-        var currentColor = new THREE.Color();
-
-        if (!geometry.getAttribute('color')) {
-            geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(positionCount * 3), 3));
-        }
-        var color = geometry.getAttribute('color').array;
-
-        for (var i = 0; i < positionCount; i++) {
-            var index = mapping ? mapping.closestSpotIndeces[i] : -1;
-            currentColor.set(this._color);
-            if (index >= 0 && !isNaN(spots[index].intensity)) {
-                this._colorMap.map(intensityColor, spots[index].intensity);
-                var alpha = 1.0 - (1.0 - this._spotBorder) * mapping.closestSpotDistances[i];
-                alpha = alpha;
-                currentColor.lerp(intensityColor, alpha);
+            function compareNumbers(a, b) {
+                return a - b;
             }
 
-            color[i * 3] = currentColor.r;
-            color[i * 3 + 1] = currentColor.g;
-            color[i * 3 + 2] = currentColor.b;
+            // Apply the scale function.
+            var values = Array.prototype.slice.call(this._activeMeasure.values, 0, this._spots.length);
+            values = values.map(this._scale.function);
+
+            // Make a copy without NaNs and inifinities. Sort it.
+            var sorted = values.filter(function(x) { return x > -Infinity && x < Infinity; }).sort(compareNumbers);
+            var min = sorted.length > 0 ? sorted[0] : NaN;
+            var max = sorted.length > 0 ? sorted[Math.ceil((sorted.length - 1) * this._hotspotQuantile)] : NaN;
+
+            for (var i = 0; i < values.length; i++) {
+                var v = values[i];
+                this._spots[i].intensity = isNaN(v) || v == -Infinity ? NaN : Math.min(1.0, (v - min) / (max - min));
+            }
+            this._recolor();
         }
-
-        geometry.getAttribute('color').needsUpdate = true;
-
-        var endTime = new Date();
-        console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
     },
 
-    _setStatus: function(status) {
-        this._status = status;
-        this._notifyChange('status-change');
+    _recolor: {
+        value: function() {
+            if (this._mode == Model.Mode.MODE_3D && this._mesh) {
+                this._recolorGeometry(this._mesh.geometry, this._mapping, this._spots);
+                this._notifyChange('3d-scene-change');
+            } else if (this._mode == Model.Mode.MODE_2D) {
+                this._notifyChange('2d-scene-needs-recoloring');
+            }
+        }
     },
 
-    _notifyChange: function(eventName) {
-        var listeners = this._listeners[eventName];
-        for (var i = 0; i < listeners.length; i++) {
-            listeners[i]();
-        }
-    }
-};
+    recolorSVG: {
+        value: function(svg) {
+            var startTime = new Date();
 
-Object.defineProperties(Model.prototype, {
+            var gradients = svg.getElementsByTagName('radialGradient');
+            var intensityColor = new THREE.Color();
+            for (var i = 0; i < gradients.length; i++) {
+                var g = gradients[i];
+                var stop0 = gradients[i].children[0];
+                var stop1 = gradients[i].children[1];
+
+                var spot = this._spots[i];
+                if (spot && !isNaN(spot.intensity)) {
+                    this._colorMap.map(intensityColor, spot.intensity);
+                    stop0.style.stopColor = stop1.style.stopColor = intensityColor.getStyle();
+                    stop0.style.stopOpacity = 1.0;
+                    stop1.style.stopOpacity = this._spotBorder;
+                } else {
+                    stop0.style.stopColor = stop1.style.stopColor = '';
+                    stop0.style.stopOpacity = stop1.style.stopOpacity = 0;
+                }
+            }
+
+            var endTime = new Date();
+            console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
+        }
+    },
+
+    _recolorGeometry: {
+        value: function(geometry, mapping, spots) {
+            if (!geometry) return;
+
+            var startTime = new Date();
+
+            var position = geometry.getAttribute('position');
+            var positionCount = position.array.length / position.itemSize;
+
+            var intensityColor = new THREE.Color();
+            var currentColor = new THREE.Color();
+
+            if (!geometry.getAttribute('color')) {
+                geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(positionCount * 3), 3));
+            }
+            var color = geometry.getAttribute('color').array;
+
+            for (var i = 0; i < positionCount; i++) {
+                var index = mapping ? mapping.closestSpotIndeces[i] : -1;
+                currentColor.set(this._color);
+                if (index >= 0 && !isNaN(spots[index].intensity)) {
+                    this._colorMap.map(intensityColor, spots[index].intensity);
+                    var alpha = 1.0 - (1.0 - this._spotBorder) * mapping.closestSpotDistances[i];
+                    alpha = alpha;
+                    currentColor.lerp(intensityColor, alpha);
+                }
+
+                color[i * 3] = currentColor.r;
+                color[i * 3 + 1] = currentColor.g;
+                color[i * 3 + 2] = currentColor.b;
+            }
+
+            geometry.getAttribute('color').needsUpdate = true;
+
+            var endTime = new Date();
+            console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
+        }
+    },
+
+    _setStatus: {
+        value: function(status) {
+            this._status = status;
+            this._notifyChange('status-change');
+        }
+    },
+
+    _notifyChange: {
+        value: function(eventName) {
+            var listeners = this._listeners[eventName];
+            for (var i = 0; i < listeners.length; i++) {
+                listeners[i]();
+            }
+        }
+    },
+
     mode: {
         get: function() {
             return this._mode;
