@@ -25,22 +25,28 @@ function View3D(model, canvas) {
     this._controls.addEventListener('change', this.redraw.bind(this));
 }
 
-View3D.prototype = {
-    redraw: function() {
-        this._renderer.render(this._model.scene, this._camera);
+View3D.prototype = Object.create(null, {
+    redraw: {
+        value: function() {
+            this._renderer.render(this._model.scene, this._camera);
+        }
     },
     
-    updateLayout: function() {
-        var width = this._canvas.clientWidth;
-        var height = this._canvas.clientHeight;
-        this._camera.aspect = width / height;
-        this._camera.updateProjectionMatrix();
-        this._renderer.setPixelRatio(devicePixelRatio);
-        this._renderer.setSize(width, height, false);
-        this.redraw();
+    updateLayout: {
+        value: function() {
+            var width = this._canvas.clientWidth;
+            var height = this._canvas.clientHeight;
+            this._camera.aspect = width / height;
+            this._camera.updateProjectionMatrix();
+            this._renderer.setPixelRatio(devicePixelRatio);
+            this._renderer.setSize(width, height, false);
+            this.redraw();
+        }
     },
 
-    _onSceneChange: function() {
-        this.redraw();
+    _onSceneChange: {
+        value: function() {
+            this.redraw();
+        }
     },
-};
+});

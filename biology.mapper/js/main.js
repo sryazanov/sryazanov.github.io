@@ -1,8 +1,17 @@
+/**
+ * Main application page.
+ */
+'use strict';
+
+// High level object. Could be easily accessed from Web Inspector.
 var g_model;
 var g_views = {};
 var g_gui;
 var g_mapSelector;
 
+/*
+ * On load initialization.
+ */
 function init() {
     g_model = new Model();
     g_views.v3D = new View3D(g_model, $('#view-container canvas.view-3d')[0]);
@@ -18,9 +27,9 @@ function init() {
     window.addEventListener('resize', updateLayout);
     document.addEventListener('keydown', onKeyDown, false);
 
-    $('#open-button').click(onOpenButtonClick);
-    $('#intensity-selection').change(onIntensitiesSelectChange);
-    $('#current-map-label').click(g_mapSelector.activate.bind(g_mapSelector));
+    $('#open-button').click(chooseFilesToOpen);
+    $('#current-map-label').click(function() {g_mapSelector.activate();});
+    $('#view-container').mousedown(function(event) {g_mapSelector.deactivate();});
 
     for (var e in DragAndDrop) {
         document.addEventListener(e, DragAndDrop[e], true);
@@ -29,6 +38,10 @@ function init() {
     onModelModeChange();
 }
 
+/**
+ * Propogates the event to all views. This method whould be called if visual location of views has changed. 
+ * So views may update scale and canvas size.
+ */
 function updateLayout() {
     for (name in g_views) {
         g_views[name].updateLayout();
@@ -36,7 +49,7 @@ function updateLayout() {
 }
 
 var KEYBOARD_SHORTCUTS = {
-    "U+004F": onOpenButtonClick, // Ctrl + O
+    "U+004F": chooseFilesToOpen, // Ctrl + O
     "U+0046": function() { g_mapSelector.activate(); } // Ctrl + F
 };
 
@@ -63,6 +76,9 @@ function onModelStatusChange() {
     }
 }
 
+/*
+ * Initializing DAT.GUI (http://workshop.chromeexperiments.com/examples/gui) controls.
+ */
 function initGUI() {
     g_gui = new dat.GUI();
     var f3d = g_gui.addFolder('3D');
@@ -75,17 +91,11 @@ function initGUI() {
     fMapping.add(g_model, 'scaleId', {'Linear': Model.Scale.LINEAR.id, 'Logarithmic': Model.Scale.LOG.id}).name('Scale');
     fMapping.add(g_model, 'hotspotQuantile').name('Hotspot quantile').step(0.0001);
     fMapping.add(g_model, 'spotBorder', 0, 1).name('Spot border').step(0.01);
-
-    var fLegent = g_gui.addFolder('Legend');
-    fLegent.add(g_views.vLegend, 'location', {
-        'None': ViewLegend.Locations.NONE,
-        'Left-top': ViewLegend.Locations.LEFT_TOP,
-        'Right-top': ViewLegend.Locations.RIGHT_TOP,
-        'Left-bottom': ViewLegend.Locations.LEFT_BOTTOM,
-        'Right-bottom': ViewLegend.Locations.RIGHT_BOTTOM,
-    }).name('Location');
 }
 
+/**
+ * Implementation of dropping files via system's D&D.'
+ */
 var DragAndDrop = {
     _counter: 0,
 
@@ -139,7 +149,10 @@ function findFileHandlers(files) {
     return result;
 }
 
-function onOpenButtonClick() {
+/**
+ * Shows file open dialog.
+ */
+function chooseFilesToOpen() {
     var fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.multiple = true;
@@ -147,11 +160,6 @@ function onOpenButtonClick() {
         openFiles(fileInput.files);
     });
     fileInput.click();
-}
-
-function onIntensitiesSelectChange() {
-    var name = $('#intensity-selection').val();
-    g_model.selectMeasure(name);
 }
 
 $(init);

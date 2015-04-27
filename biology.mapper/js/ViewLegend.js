@@ -6,32 +6,9 @@ function ViewLegend(model, svg) {
     this.updateColorMap();
 }
 
-ViewLegend.Locations = {
-    NONE: 'none',
-    LEFT_TOP: 'left-top',
-    RIGHT_TOP: 'right-top',
-    LEFT_BOTTOM: 'left-bottom',
-    RIGHT_BOTTOM: 'right-bottom'
-};
-
 ViewLegend.prototype = Object.create(null, {
     updateLayout: {
         value: function() {}
-    },
-
-    location: {
-        get: function() {
-            return this._svg.getAttribute('location');
-        },
-        set: function(value) {
-            for (var i in ViewLegend.Locations) {
-                if (ViewLegend.Locations[i] == value) {
-                    this._svg.setAttribute('location', value);
-                    return;
-                }
-            }
-            throw 'Invalid location: ' + value;
-        }
     },
 
     updateColorMap: {

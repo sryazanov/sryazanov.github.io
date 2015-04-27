@@ -1,10 +1,34 @@
+'use strict';
+
+/**
+ * Main application model. It works in 3 modes:
+ * 1. UNDEFINED. In may have measures but with no visual representation.
+ * 2. MODE_2D. It has image. Spots are mapped on this image using X and Y
+ *    coordinates (Z ignored). It can buildSVG which represents the image and
+ *    the spots (must be rebuild on '2d-scene-change'). If ony spots colors
+ *    changed then the '2d-scene-needs-recoloring' event fires and previously
+ *    built SVG could be updated via recolorSVG (faster than rebuilding SVG
+ *    from the ground).
+ * 3. MODE_3D. It has a THREE.js scene with a mesh, light souces ets.
+ *    Canvas must be redrawn then '3d-scene-change' fired.
+ *
+ * Model tracks changes in measures, images and meshes and fires appropriates
+ * events to allow updates. Model may have multiple views (2D and 3D view
+ * shouldn't be mixed). Different 3D view for instance may show the same scene
+ * from different perspectives.
+ *
+ * 'status'/'status-change' intended to inform
+ * the user on progress in long-running tasks.
+ *
+ * 'measures'/'intensities-change' lets to update the map-list.
+ */
 function Model() {
     this._listeners = {
         'status-change': [],
         'mode-change': [],
-        '3d-scene-change': [],
         '2d-scene-change': [],
         '2d-scene-needs-recoloring': [],
+        '3d-scene-change': [],
         'intensities-change': [],
     };
     this._mode = Model.Mode.UNDEFINED;
@@ -22,7 +46,7 @@ function Model() {
 
     // 3D scene
     this._scene = new THREE.Scene();
-    this._3DMaterial = new THREE.MeshLambertMaterial({
+    this._material = new THREE.MeshLambertMaterial({
         vertexColors: THREE.VertexColors,
         transparent: true,
         opacity: 0.9,
@@ -71,10 +95,16 @@ Model.getScaleById = function(id) {
     throw 'Invalid scale id: ' + id;
 };
 
+/**
+ * Asynchromous tasks. At most one task with the same key may run
+ * (no 2 images could be loading simultaniously). Newer task cancels older one.
+ * 'worker' is name of JS file in 'js/workers' or constructor of a Worker-like
+ * class.
+ */
 Model.TaskType = {
     LOAD_IMAGE: {
         key: 'load-image',
-        worker: null
+        worker: null // Model.ImageLoader
     },
 
     LOAD_MESH: {
@@ -100,6 +130,78 @@ Model.prototype = Object.create(null, {
         }
     },
 
+    /**
+     * Switches the model to MODE_2D and starts image loading.
+     */
+    loadImage: {
+        value: function(file) {
+            this.mode = Model.Mode.MODE_2D;
+
+            this._setImage(null);
+            this._doTask(Model.TaskType.LOAD_IMAGE, file).then(function(result) {
+                this._setImage(result.url, result.width, result.height);
+            }.bind(this));
+        }
+    },
+
+    /**
+     * Switches the model to MODE_3D and starts mesh loading.
+     */
+    loadMesh: {
+        value: function(file) {
+            this.mode = Model.Mode.MODE_3D;
+
+            this.mesh = null;
+            this._doTask(Model.TaskType.LOAD_MESH, file).then(function(result) {
+                var geometry = new THREE.BufferGeometry();
+                for (var name in event.data.attributes) {
+                    var attribute = event.data.attributes[name];
+                    geometry.addAttribute(name, new THREE.BufferAttribute(
+                            attribute.array, attribute.itemSize));
+                }
+                this._recolorGeometry(geometry, null, null);
+                this.mesh = new THREE.Mesh(geometry, this._material);
+                this._mapMesh();
+            }.bind(this));
+        }
+    },
+
+    /**
+     * Starts loading intensities file.
+     */
+    loadIntensities: {
+        value: function(file) {
+            this._doTask(Model.TaskType.LOAD_MEASURES, file).then(function(result) {
+                this._spots = result.spots;
+                this._measures = result.measures;
+                this._activeMeasure = null;
+                if (this._mode == Model.Mode.MODE_3D)
+                    this._mapMesh();
+                else if (this._mode == Model.Mode.MODE_2D)
+                    this._notifyChange('2d-scene-change');
+                this._notifyChange('intensities-change');
+            }.bind(this));
+        }
+    },
+
+    /*
+     * @param {index} Index in the this.measures list.
+     */
+    selectMeasure: {
+        value: function(index) {
+            if (!this._measures) return;
+
+            this._activeMeasure = this._measures[index];
+            this._updateIntensities();
+        }
+    },
+
+    /**
+     * Build SVG for 2D mode (see Model class description). Since SVG elements
+     * couldn't be shared among views each view should build it's own.
+     *
+     * @return {SVGGElement}
+     */
     buildSVG: {
         value: function(document) {
             if (!this._image) return null;
@@ -128,60 +230,43 @@ Model.prototype = Object.create(null, {
         }
     },
 
-    loadImage: {
-        value: function(file) {
-            this.mode = Model.Mode.MODE_2D;
+    /**
+     * Updates SVG to reflect current colors.
+     *
+     * @param {SVGGElement} Element previously built by 'buildSVG'.
+     */
+    recolorSVG: {
+        value: function(svg) {
+            var startTime = new Date();
 
-            this._setImage(null);
-            this._doTask(Model.TaskType.LOAD_IMAGE, file).then(function(result) {
-                this._setImage(result.url, result.width, result.height);
-            }.bind(this));
-        }
-    },
+            var gradients = svg.getElementsByTagName('radialGradient');
+            var intensityColor = new THREE.Color();
+            for (var i = 0; i < gradients.length; i++) {
+                var g = gradients[i];
+                var stop0 = gradients[i].children[0];
+                var stop1 = gradients[i].children[1];
 
-    loadMesh: {
-        value: function(file) {
-            this.mode = Model.Mode.MODE_3D;
-
-            this.mesh = null;
-            this._doTask(Model.TaskType.LOAD_MESH, file).then(function(result) {
-                var geometry = new THREE.BufferGeometry();
-                for (var name in event.data.attributes) {
-                    var attribute = event.data.attributes[name];
-                    geometry.addAttribute(name, new THREE.BufferAttribute(attribute.array, attribute.itemSize));
+                var spot = this._spots[i];
+                if (spot && !isNaN(spot.intensity)) {
+                    this._colorMap.map(intensityColor, spot.intensity);
+                    stop0.style.stopColor = stop1.style.stopColor = intensityColor.getStyle();
+                    stop0.style.stopOpacity = 1.0;
+                    stop1.style.stopOpacity = this._spotBorder;
+                } else {
+                    stop0.style.stopColor = stop1.style.stopColor = '';
+                    stop0.style.stopOpacity = stop1.style.stopOpacity = 0;
                 }
-                this._recolorGeometry(geometry, null, null);
-                this.mesh = new THREE.Mesh(geometry, this._3DMaterial);
-                this.map();
-            }.bind(this));
+            }
+
+            var endTime = new Date();
+            console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
         }
     },
 
-    loadIntensities: {
-        value: function(file) {
-            this._doTask(Model.TaskType.LOAD_MEASURES, file).then(function(result) {
-                this._spots = result.spots;
-                this._measures = result.measures;
-                this._activeMeasure = null;
-                if (this._mode == Model.Mode.MODE_3D)
-                    this.map();
-                else if (this._mode == Model.Mode.MODE_2D)
-                    this._notifyChange('2d-scene-change');
-                this._notifyChange('intensities-change');
-            }.bind(this));
-        }
-    },
-
-    selectMeasure: {
-        value: function(index) {
-            if (!this._measures) return;
-
-            this._activeMeasure = this._measures[index];
-            this._updateIntensities();
-        }
-    },
-
-    map: {
+    /**
+     * Prepares this._mapping for fast recoloring the mesh.
+     */
+    _mapMesh: {
         value: function() {
             if (!this._mesh || !this._spots) return;
             var args = {
@@ -246,13 +331,21 @@ Model.prototype = Object.create(null, {
         }
     },
 
+    /**
+     * Starts a new task (cancels an old one it it's running).
+     *
+     * @param {Model.TaskType} taskType Task to run.
+     * @param {Object} args Arguments to post to the task's worker.
+     * @return {Promise}
+     **/
     _doTask: {
         value: function(taskType, args) {
             if (taskType.key in this._tasks) this._cancelTask(taskType);
 
             var task = {
                 worker: typeof taskType.worker == 'function' ?
-                        new taskType.worker() : new Worker('js/workers/' + taskType.worker),
+                        new taskType.worker() :
+                        new Worker('js/workers/' + taskType.worker),
                 status: '',
                 cancel: this._cancelTask.bind(this, taskType),
                 startTime: new Date().valueOf(),
@@ -267,7 +360,8 @@ Model.prototype = Object.create(null, {
                         setStatus('');
                         resolve(event.data);
                         task.cancel();
-                        console.info('Task ' + taskType.key + ' completed in ' + (new Date().valueOf() - task.startTime) / 1000 + ' sec');
+                        console.info('Task ' + taskType.key + ' completed in ' +
+                                     (new Date().valueOf() - task.startTime) / 1000 + ' sec');
                     } else if (event.data.status == 'failed') {
                         reject(event.data);
                         task.cancel();
@@ -310,17 +404,24 @@ Model.prototype = Object.create(null, {
             }
 
             // Apply the scale function.
-            var values = Array.prototype.slice.call(this._activeMeasure.values, 0, this._spots.length);
+            var values = Array.prototype.slice.call(
+                    this._activeMeasure.values, 0, this._spots.length);
             values = values.map(this._scale.function);
 
             // Make a copy without NaNs and inifinities. Sort it.
-            var sorted = values.filter(function(x) { return x > -Infinity && x < Infinity; }).sort(compareNumbers);
+            var sorted = values.filter(function(x) {
+                return x > -Infinity && x < Infinity;
+            }).sort(compareNumbers);
             var min = sorted.length > 0 ? sorted[0] : NaN;
-            var max = sorted.length > 0 ? sorted[Math.ceil((sorted.length - 1) * this._hotspotQuantile)] : NaN;
+            var max = sorted.length > 0 ?
+                    sorted[Math.ceil((sorted.length - 1) *
+                           this._hotspotQuantile)] :
+                    NaN;
 
             for (var i = 0; i < values.length; i++) {
                 var v = values[i];
-                this._spots[i].intensity = isNaN(v) || v == -Infinity ? NaN : Math.min(1.0, (v - min) / (max - min));
+                this._spots[i].intensity = isNaN(v) || v == -Infinity ?
+                        NaN : Math.min(1.0, (v - min) / (max - min));
             }
             this._recolor();
         }
@@ -329,39 +430,12 @@ Model.prototype = Object.create(null, {
     _recolor: {
         value: function() {
             if (this._mode == Model.Mode.MODE_3D && this._mesh) {
-                this._recolorGeometry(this._mesh.geometry, this._mapping, this._spots);
+                this._recolorGeometry(
+                        this._mesh.geometry, this._mapping, this._spots);
                 this._notifyChange('3d-scene-change');
             } else if (this._mode == Model.Mode.MODE_2D) {
                 this._notifyChange('2d-scene-needs-recoloring');
             }
-        }
-    },
-
-    recolorSVG: {
-        value: function(svg) {
-            var startTime = new Date();
-
-            var gradients = svg.getElementsByTagName('radialGradient');
-            var intensityColor = new THREE.Color();
-            for (var i = 0; i < gradients.length; i++) {
-                var g = gradients[i];
-                var stop0 = gradients[i].children[0];
-                var stop1 = gradients[i].children[1];
-
-                var spot = this._spots[i];
-                if (spot && !isNaN(spot.intensity)) {
-                    this._colorMap.map(intensityColor, spot.intensity);
-                    stop0.style.stopColor = stop1.style.stopColor = intensityColor.getStyle();
-                    stop0.style.stopOpacity = 1.0;
-                    stop1.style.stopOpacity = this._spotBorder;
-                } else {
-                    stop0.style.stopColor = stop1.style.stopColor = '';
-                    stop0.style.stopOpacity = stop1.style.stopOpacity = 0;
-                }
-            }
-
-            var endTime = new Date();
-            console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
         }
     },
 
@@ -378,7 +452,8 @@ Model.prototype = Object.create(null, {
             var currentColor = new THREE.Color();
 
             if (!geometry.getAttribute('color')) {
-                geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(positionCount * 3), 3));
+                geometry.addAttribute('color', new THREE.BufferAttribute(
+                        new Float32Array(positionCount * 3), 3));
             }
             var color = geometry.getAttribute('color').array;
 
@@ -386,8 +461,10 @@ Model.prototype = Object.create(null, {
                 var index = mapping ? mapping.closestSpotIndeces[i] : -1;
                 currentColor.set(this._color);
                 if (index >= 0 && !isNaN(spots[index].intensity)) {
-                    this._colorMap.map(intensityColor, spots[index].intensity);
-                    var alpha = 1.0 - (1.0 - this._spotBorder) * mapping.closestSpotDistances[i];
+                    this._colorMap.map(
+                            intensityColor, spots[index].intensity);
+                    var alpha = 1.0 - (1.0 - this._spotBorder) *
+                            mapping.closestSpotDistances[i];
                     alpha = alpha;
                     currentColor.lerp(intensityColor, alpha);
                 }
@@ -400,7 +477,8 @@ Model.prototype = Object.create(null, {
             geometry.getAttribute('color').needsUpdate = true;
 
             var endTime = new Date();
-            console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
+            console.log('Recoloring time: ' +
+                    (endTime.valueOf() - startTime.valueOf()) / 1000);
         }
     },
 
@@ -573,6 +651,10 @@ Model.prototype = Object.create(null, {
     }
 });
 
+/**
+ * Worker-like object what loads an image and calculate it sizes
+ * (can't be a worker because uses Image).
+ */
 Model.ImageLoader = function() {
     this.onmessage = null;
     this._reader = new FileReader();

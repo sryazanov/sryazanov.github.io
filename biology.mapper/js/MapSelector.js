@@ -5,14 +5,16 @@ function MapSelector(model, div, mapName) {
     this._input = this._div.querySelector('input');
     this._itemsContainer = this._div.querySelector('.items');
     this._filter = '';
-    this._deactivationTimeout = 0;
+    this._effectTimeout = 0;
     this._measures = null;
     this._selectedIndex = -1;
+    this._div.style.opacity = 0;
     this._model.addEventListener('intensities-change', this._onModelIntencitiesChange.bind(this));
     this._input.addEventListener('input', this._onInput.bind(this));
     this._input.addEventListener('blur', this._onBlur.bind(this));
     this._input.addEventListener('keydown', this._onKeyDown.bind(this), false);
     this._itemsContainer.addEventListener('mousedown', this._onItemMouseDown.bind(this), false);
+    this._itemsContainer.addEventListener('click', this._onItemClick.bind(this), false);
     this._onModelIntencitiesChange();
 }
 
@@ -58,18 +60,28 @@ MapSelector.prototype = Object.create(null, {
             this._div.hidden = false;
             this._input.focus();
             this._input.select();
-            if (this._deactivationTimeout) {
-                clearTimeout(this._deactivationTimeout);
-            }
+            this._deffer(function() {
+                this._div.style.opacity = 1;
+            }.bind(this), 0);
         }
     },
 
     deactivate: {
         value: function() {
-            this._deactivationTimeout = setTimeout(function() {
+            this._div.style.opacity = 0;
+            this._deffer(function() {
                 this._div.hidden = true;
-                this._deactivationTimeout = 0;
-            }.bind(this), 100);
+            }.bind(this), 200);
+        }
+    },
+
+    _deffer: {
+        value: function(fn, timeout) {
+            if (this._effectTimeout) clearTimeout(this._effectTimeout);
+            this._effectTimeout = setTimeout(function() {
+                this._effectTimeout = 0;
+                fn();
+            }.bind(this), timeout);
         }
     },
 
@@ -164,12 +176,22 @@ MapSelector.prototype = Object.create(null, {
 
     _onItemMouseDown: {
         value: function(event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    },
+
+    _onItemClick: {
+        value: function(event) {
             if (event.target == this._itemsContainer) return;
             var item = event.target;
             while (item.parentElement != this._itemsContainer) {
                 item = item.parentElement;
             }
             this.selectedItem = item;
+            this.activate();
+            event.stopPropagation();
+            event.preventDefault();
         }
     },
 

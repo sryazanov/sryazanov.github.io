@@ -61,12 +61,17 @@ body[drop-target] > #view-container[mode=''] > .view-welcome.view-welcome {
     cursor: pointer;
 }
 
+#current-map-label {
+    cursor: pointer;
+    -webkit-user-select: none;
+}
+
 #map-selector {
     position: absolute;
     right: 20px;
     top: 30%;
     width: 200px;
-    bottom: 120px;
+    bottom: 100px;
     background-color: silver;
     overflow:  hidden;
     z-index: 100;
@@ -74,6 +79,8 @@ body[drop-target] > #view-container[mode=''] > .view-welcome.view-welcome {
     flex-direction: column;
     border: 1px solid #002000;
     font: 12px 'Lucida Grande', sans-serif;
+    transition: opacity 200ms;
+    box-sizing: border-box;
 }
 
 #map-selector[hidden] {
@@ -88,11 +95,12 @@ body[drop-target] > #view-container[mode=''] > .view-welcome.view-welcome {
 #map-selector > .items {
     overflow-y: auto;
     flex: 1;
-    padding: 3px;
+    background-color:  white;
 }
 
 #map-selector > .items > * {
     cursor: pointer;
+    padding: 3px;
 }
 
 #map-selector > .items > *[selected] {
@@ -137,28 +145,6 @@ body[drop-target] > #drop-target-informer {
     width: 200px;
     height: 80px;
     position: absolute;
-}
-
-[location="right-bottom"] {
     right: 20px;
     bottom: 20px;
-}
-
-[location="right-top"] {
-    right: 20px;
-    top: 20px;
-}
-
-[location="left-bottom"] {
-    left: 20px;
-    bottom: 20px;
-}
-
-[location="left-top"] {
-    left: 20px;
-    top: 20px;
-}
-
-[location="none"] {
-    display: none;
 }
