@@ -1,3 +1,12 @@
+/**
+ * UI control (#map-selector) which let the user to select an active map
+ * (measurement). Text input lets type filter for map name. Item list (.items)
+ * shows only items that contain the filter's substring (and highlights it).
+ *
+ * @param {Model} model.
+ * @param {HTMLDivElement} div Main HTML element (#map-selector).
+ * @mapName {HTMLElement|SGVElement} mapName Element to show current map name.
+ */
 function MapSelector(model, div, mapName) {
     this._model = model;
     this._div = div;
@@ -164,9 +173,25 @@ MapSelector.prototype = Object.create(null, {
                 if (next) this.selectedItem = next;
                 event.preventDefault();
             } else if (event.keyCode == 33 /* Page up */) {
-                // TODO: implement.
+                var len = Math.max(10, this._itemsContainer.childElementCount / 10);
+                if (!len) return;
+                var item = this.selectedItem;
+                if (!item) item = this._itemsContainer.lastElementChild;
+                for (var i = 0; i < len; i++) {
+                    if (!item.previousElementSibling) break;
+                    item = item.previousElementSibling;
+                }
+                this.selectedItem = item;
             } else if (event.keyCode == 34 /* Page down */) {
-                // TODO: implement.
+                var len = Math.max(10, this._itemsContainer.childElementCount / 10);
+                if (!len) return;
+                var item = this.selectedItem;
+                if (!item) item = this._itemsContainer.firstElementChild;
+                for (var i = 0; i < len; i++) {
+                    if (!item.nextElementSibling) break;
+                    item = item.nextElementSibling;
+                }
+                this.selectedItem = item;
             } else if (event.keyCode == 27 /* Escape */ || event.keyCode == 13 /* Enter */) {
                 this.deactivate();
                 event.preventDefault();

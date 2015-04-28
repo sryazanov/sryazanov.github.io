@@ -16,9 +16,11 @@ ViewLegend.prototype = Object.create(null, {
             var description = this._model.colorMapGradient;
             var stops = [];
             for (var i in description) {
-                stops.push('<stop offset="' + i + '" style="stop-color:' + description[i] + '" />');
+                stops.push('<stop offset="' + i + '" style="stop-color:' +
+                           description[i] + '" />');
             }
-            this._svg.getElementById('colorMapGradient').innerHTML = stops.join('');
+            this._svg.getElementById('colorMapGradient').innerHTML =
+                    stops.join('');
         }
     }
 });

@@ -1,5 +1,11 @@
 'use striict';
 
+/**
+ * Base class for color maps.
+ *
+ * @param {Array<String>} colorValues Values are css-like colors at
+ *                        i / (length - 1) point.
+ */
 function ColorMap(colorValues) {
     this._colors = new Array(colorValues.length);
     for (var i = 0; i < this._colors.length; i++) {
@@ -8,6 +14,10 @@ function ColorMap(colorValues) {
 }
 
 ColorMap.prototype = Object.create(null, {
+    /**
+     * @param {THREE.Color} color Result (out parameter).
+     * @param {Number} intensity In range of [0, 1].
+     */
     map: {
         value: function(color, intensity) {
             if (intensity <= 0.0) {
@@ -28,6 +38,12 @@ ColorMap.prototype = Object.create(null, {
         }
     },
 
+    /**
+     * Creates data for CSS or SGV gradient stop points.
+     *
+     * @return {Hash<String>} Keys are stop-points (like '0%'), values are
+     *                        colors.
+     */
     gradient: {
         get: function() {
             var result = {};
@@ -41,7 +57,17 @@ ColorMap.prototype = Object.create(null, {
 });
 
 function JetColorMap() {
-    ColorMap.call(this, ['#00007F', 'blue', '#007FFF','cyan', '#7FFF7F', 'yellow', '#FF7F00', 'red', '#7F0000']);
+    ColorMap.call(this, [
+            '#00007F',
+            'blue',
+            '#007FFF',
+            'cyan',
+            '#7FFF7F',
+            'yellow',
+            '#FF7F00',
+            'red',
+            '#7F0000'
+    ]);
 };
 
 JetColorMap.prototype = Object.create(ColorMap.prototype);

@@ -529,7 +529,7 @@ Model.prototype = Object.create(null, {
             var color = new THREE.Color(value);
             if (color.equals(this._color)) return;
             this._color.set(color);
-            this._recolor();
+            if (this._mesh) this._recolor();
         }
     },
 

@@ -1,3 +1,9 @@
+/**
+ * Web worker what builds association between points on the mesh (only used for
+ * MODE_3D) and spots. Having this accosiation prebuilt recoloring the mesh for
+ * any specific map related to the same spots could be done much faster.
+ */
+
 onmessage = function(e) {
     var positions = e.data.verteces;
     var spots = e.data.spots;
@@ -44,14 +50,13 @@ onmessage = function(e) {
 
         closestSpotIndeces[i] = closestSpotIndex;
         if (closestSpotIndex >= 0) {
-            closestSpotDistances[i] = Math.sqrt(closesSpotSquareDistance) / spots[closestSpotIndex].r;
+            closestSpotDistances[i] = Math.sqrt(closesSpotSquareDistance) /
+                                      spots[closestSpotIndex].r;
             highlightedVerteces++;
         } else {
             closestSpotDistances[i] = 1.0;
         }
     }
-
-    console.log('Highlighted verteces: ' + highlightedVerteces);
 
     postMessage({
         status: 'completed',

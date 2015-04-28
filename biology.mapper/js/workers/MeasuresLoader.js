@@ -1,3 +1,20 @@
+/**
+ * Web Worker that loads measures and spots from the CSV file.
+ * First row of the CSV file is a header with column names. First 5 column
+ * are predefined and their names are ignored:
+ * 1. Spot name.
+ * 2. X coordinate of the spot.
+ * 3. Y coordinate.
+ * 4. Z coordinate. Ignored for MODE_2D (values should be empty).
+ * 5. Radius.
+ *
+ * Coordinates for MODE_2D are in pixels, for MODE_3D are in mesh's units.
+ *
+ * Subsequent columns are measures. Column names are displayed in the
+ * MapSelector. Missing values should have empty cells. That spots won't be
+ * highlighted.
+ */
+
 importScripts('../lib/papaparse.min.js');
 
 onmessage = function(e) {
@@ -43,7 +60,8 @@ Handler.prototype = {
             r: Number(row[4]),
             intensity: NaN,
         };
-        if (isNaN(spot.x) || isNaN(spot.y) || isNaN(spot.y) || isNaN(spot.z) || isNaN(spot.r)) {
+        if (isNaN(spot.x) || isNaN(spot.y) || isNaN(spot.y) ||
+                isNaN(spot.z) || isNaN(spot.r)) {
             parser.abort();
             this._reportError('Invalid spot coordinates');
             return;
@@ -51,7 +69,8 @@ Handler.prototype = {
 
         for (j = 0; j < this.measures.length; j++) {
             var value = row[j + 5];
-            this.measures[j].values[this.spots.length] = value == '' ? NaN : Number(value);
+            this.measures[j].values[this.spots.length] =
+                    value === '' ? NaN : Number(value);
         }
 
         this.spots.push(spot);

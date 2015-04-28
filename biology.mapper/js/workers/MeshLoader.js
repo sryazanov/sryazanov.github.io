@@ -1,3 +1,7 @@
+/**
+ * Web Worker. Loads a mesh from STL file.
+ */
+
 importScripts('../lib/three.min.js', '../lib/STLLoader.js');
 
 onmessage = function(e) {
