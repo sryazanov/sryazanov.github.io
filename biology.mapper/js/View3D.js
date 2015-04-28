@@ -36,6 +36,7 @@ function View3D(model, canvas) {
 View3D.prototype = Object.create(null, {
     redraw: {
         value: function() {
+            this._renderer.setClearColor(this._model.backgroundColorValue);
             this._renderer.render(this._model.scene, this._camera);
         }
     },

@@ -39,6 +39,7 @@ function Model() {
     this._image = null;
     this._activeMeasure = null;
     this._color = new THREE.Color('#001eb2');
+    this._backgroundColor = new THREE.Color('black');
     this._colorMap = new JetColorMap();
     this._scale = Model.Scale.LOG;
     this._hotspotQuantile = 0.995;
@@ -138,7 +139,8 @@ Model.prototype = Object.create(null, {
             this.mode = Model.Mode.MODE_2D;
 
             this._setImage(null);
-            this._doTask(Model.TaskType.LOAD_IMAGE, file).then(function(result) {
+            this._doTask(Model.TaskType.LOAD_IMAGE, file).
+                    then(function(result) {
                 this._setImage(result.url, result.width, result.height);
             }.bind(this));
         }
@@ -171,7 +173,8 @@ Model.prototype = Object.create(null, {
      */
     loadIntensities: {
         value: function(file) {
-            this._doTask(Model.TaskType.LOAD_MEASURES, file).then(function(result) {
+            this._doTask(Model.TaskType.LOAD_MEASURES, file).
+                    then(function(result) {
                 this._spots = result.spots;
                 this._measures = result.measures;
                 this._activeMeasure = null;
@@ -222,7 +225,8 @@ Model.prototype = Object.create(null, {
             groupElement.appendChild(labelsGroupElement);
 
             if (this._spots) {
-                this._createSVGSpots(spotsGroupElement, labelsGroupElement, defsElement);
+                this._createSVGSpots(
+                        spotsGroupElement, labelsGroupElement, defsElement);
                 this.recolorSVG(groupElement);
             }
 
@@ -249,7 +253,8 @@ Model.prototype = Object.create(null, {
                 var spot = this._spots[i];
                 if (spot && !isNaN(spot.intensity)) {
                     this._colorMap.map(intensityColor, spot.intensity);
-                    stop0.style.stopColor = stop1.style.stopColor = intensityColor.getStyle();
+                    stop0.style.stopColor = stop1.style.stopColor =
+                            intensityColor.getStyle();
                     stop0.style.stopOpacity = 1.0;
                     stop1.style.stopOpacity = this._spotBorder;
                 } else {
@@ -259,7 +264,8 @@ Model.prototype = Object.create(null, {
             }
 
             var endTime = new Date();
-            console.log('Recoloring time: ' + (endTime.valueOf() - startTime.valueOf()) / 1000);
+            console.log('Recoloring time: ' +
+                    (endTime.valueOf() - startTime.valueOf()) / 1000);
         }
     },
 
@@ -270,7 +276,8 @@ Model.prototype = Object.create(null, {
         value: function() {
             if (!this._mesh || !this._spots) return;
             var args = {
-                verteces: this._mesh.geometry.getAttribute('original-position').array,
+                verteces: this._mesh.geometry.getAttribute(
+                        'original-position').array,
                 spots: this._spots
             };
             this._doTask(Model.TaskType.MAP, args).then(function(results) {
@@ -293,7 +300,8 @@ Model.prototype = Object.create(null, {
             for (var i = 0; i < this._spots.length; i++) {
                 var spot = this._spots[i];
 
-                var gradientElement = document.createElementNS(SVGNS, 'radialGradient');
+                var gradientElement = document.createElementNS(
+                    SVGNS, 'radialGradient');
                 gradientElement.cx.baseVal = "50%";
                 gradientElement.cy.baseVal = "50%";
                 gradientElement.r.baseVal = "50%";
@@ -361,7 +369,8 @@ Model.prototype = Object.create(null, {
                         resolve(event.data);
                         task.cancel();
                         console.info('Task ' + taskType.key + ' completed in ' +
-                                     (new Date().valueOf() - task.startTime) / 1000 + ' sec');
+                                     (new Date().valueOf() - task.startTime) /
+                                     1000 + ' sec');
                     } else if (event.data.status == 'failed') {
                         reject(event.data);
                         task.cancel();
@@ -533,6 +542,27 @@ Model.prototype = Object.create(null, {
         }
     },
 
+    backgroundColor: {
+        get: function() {
+            return '#' + this._backgroundColor.getHexString();
+        },
+
+        set: function(value) {
+            var color = new THREE.Color(value);
+            if (color.equals(this._backgroundColor)) return;
+            this._backgroundColor.set(color);
+            if (this._mode == Model.Mode.MODE_3D) {
+                this._notifyChange('3d-scene-change');
+            }
+        }
+    },
+
+    backgroundColorValue: {
+        get: function() {
+            return this._backgroundColor;
+        }
+    },
+
     scene: {
         get: function() {
             return this._scene;
@@ -567,7 +597,10 @@ Model.prototype = Object.create(null, {
 
     imageSize: {
         get: function() {
-            return this._image && {width: this._image.width, height: this._image.height};
+            return this._image && {
+                width: this._image.width,
+                height: this._image.height
+            };
         }
     },
 

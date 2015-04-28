@@ -83,6 +83,7 @@ function initGUI() {
     g_gui = new dat.GUI();
     var f3d = g_gui.addFolder('3D');
     f3d.addColor(g_model, 'color').name('Color');
+    f3d.addColor(g_model, 'backgroundColor').name('Background color');
     f3d.add(g_model, 'lightIntensity1', 0, 1).name('Light 1');
     f3d.add(g_model, 'lightIntensity2', 0, 1).name('Light 2');
     f3d.add(g_model, 'lightIntensity3', 0, 1).name('Light 3');
